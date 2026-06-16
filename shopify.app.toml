@@ -1,0 +1,24 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "41301c0c55625866ed02a62a1e0a8e8c"
+name = "ICTECHM2SMigrator"
+application_url = "https://beam-flash-large-holding.trycloudflare.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+
+[webhooks]
+api_version = "2026-04"
+
+[[webhooks.subscriptions]]
+uri = "/webhooks/compliance"
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+
+[access_scopes]
+scopes = "read_products,write_products,read_inventory,write_inventory,read_locations,write_customers,write_orders,read_publications,write_publications,read_online_store_navigation,write_online_store_navigation,write_files,write_discounts,read_discounts,read_translations,write_translations,read_locales,read_markets,write_markets"
+
+[auth]
+redirect_urls = [
+  "https://beam-flash-large-holding.trycloudflare.com/auth/shopify/callback"
+]

@@ -1,0 +1,102 @@
+body[data-ictech-route] .Polaris-Frame__TopBar {
+  display: none;
+}
+
+body[data-ictech-route] .Polaris-Frame__Navigation {
+  top: 0;
+}
+
+body[data-ictech-route] .Polaris-Frame__ContextualSaveBar {
+  top: 0;
+}
+
+body[data-ictech-route] .Polaris-Navigation__Item {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+body[data-ictech-route] .Polaris-Navigation__Icon {
+  margin-top: 3px;
+  margin-bottom: 2px;
+}
+
+body[data-ictech-route] .Polaris-Navigation__ItemWrapper {
+  align-items: center;
+}
+
+body[data-ictech-route] .Polaris-Navigation__Icon {
+  display: flex;
+  align-items: center;
+}
+
+body[data-ictech-route] a[href*="page=dashboard"] .Polaris-Icon {
+  color: #6d28d9;
+}
+
+body[data-ictech-route] a[href*="page=migration"] .Polaris-Icon {
+  color: #0ea5e9;
+}
+
+body[data-ictech-route] .Polaris-Navigation__Item--selected {
+  border-left: 3px solid transparent;
+}
+
+body[data-ictech-route="dashboard"] .Polaris-Navigation__Item--selected {
+  border-left-color: #6d28d9;
+}
+
+body[data-ictech-route="migration"] .Polaris-Navigation__Item--selected {
+  border-left-color: #0ea5e9;
+}
+
+body[data-ictech-route] .Polaris-Navigation__Item--selected .Polaris-Text--bodyMd {
+  font-weight: 600;
+}
+
+/* Enhanced Tab Navigation Styling */
+.Polaris-Tabs__Tab {
+  transition: all 0.2s ease;
+}
+
+.Polaris-Tabs__Tab:hover {
+  background-color: var(--p-color-bg-surface-hover);
+}
+
+.Polaris-Tabs__Tab--selected {
+  background-color: var(--p-color-bg-fill-brand-hover) !important;
+  border-bottom: 3px solid var(--p-color-border-brand) !important;
+}
+
+.Polaris-Tabs__Tab--selected .Polaris-Text--root {
+  color: var(--p-color-text-brand) !important;
+  font-weight: 600 !important;
+}
+
+.Polaris-Tabs__Panel {
+  background-color: var(--p-color-bg-surface);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+/* Wizard Progress Indicator Enhancement */
+.wizard-step-button {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.wizard-step-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.wizard-step-button:active {
+  transform: translateY(0);
+}
+
+/* Improved mapping grid rows */
+.mapping-row {
+  transition: background-color 0.2s ease;
+}
+
+.mapping-row:hover {
+  background-color: var(--p-color-bg-surface-hover) !important;
+}

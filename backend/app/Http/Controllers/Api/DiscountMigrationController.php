@@ -57,6 +57,20 @@ class DiscountMigrationController extends Controller
                 continue;
             }
 
+            $couponType = $promotion['coupon_type'] ?? null;
+            if ($couponType === 2 || $couponType === '2' || $couponType === 'SPECIFIC_COUPON') {
+                $coupons = $magento->fetchCouponsForRule($conn, $sourceId);
+                if (!empty($coupons)) {
+                    $promotion['coupon_code'] = $coupons[0]['code'] ?? '';
+                    if (isset($coupons[0]['usage_limit'])) {
+                        $promotion['uses_per_coupon'] = $coupons[0]['usage_limit'];
+                    }
+                    if (isset($coupons[0]['usage_per_customer'])) {
+                        $promotion['uses_per_customer'] = $coupons[0]['usage_per_customer'];
+                    }
+                }
+            }
+
             $mapped = $mapper->map($promotion);
 
             $discountType = null;

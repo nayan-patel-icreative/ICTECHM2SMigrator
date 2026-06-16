@@ -456,6 +456,36 @@ class MagentoClient
     }
 
     /**
+     * Fetch coupons associated with a specific sales rule by ID.
+     */
+    public function fetchCouponsForRule(MagentoConnection $conn, string $ruleId): array
+    {
+        $query = [
+            'searchCriteria' => [
+                'filterGroups' => [
+                    [
+                        'filters' => [
+                            [
+                                'field' => 'rule_id',
+                                'value' => $ruleId,
+                                'conditionType' => 'eq'
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ];
+
+        try {
+            $res = $this->request($conn, 'GET', '/V1/coupons/search', ['query' => $query]);
+            return $res['items'] ?? [];
+        } catch (\Throwable $e) {
+            Log::error('Magento coupons search failed', ['rule_id' => $ruleId, 'error' => $e->getMessage()]);
+            return [];
+        }
+    }
+
+    /**
      * Search manufacturers (retrieve options of the 'manufacturer' attribute).
      */
     public function searchManufacturers(MagentoConnection $conn, int $limit = 50, int $page = 1): array

@@ -21,7 +21,9 @@ class DiscountMapper
     {
         $issues = [];
         
-        $hasCode = (isset($rule['coupon_code']) && trim((string) $rule['coupon_code']) !== '') || ((int) ($rule['coupon_type'] ?? 1) === 2);
+        $couponType = $rule['coupon_type'] ?? null;
+        $hasCode = (isset($rule['coupon_code']) && trim((string) $rule['coupon_code']) !== '') 
+            || ($couponType === 2 || $couponType === '2' || $couponType === 'SPECIFIC_COUPON');
         
         $action = strtolower(trim((string) ($rule['simple_action'] ?? 'by_percent')));
         $isFreeShipping = (int) ($rule['simple_free_shipping'] ?? 0) > 0;
@@ -77,6 +79,11 @@ class DiscountMapper
             $input['endsAt'] = $endsAt;
         }
 
+        $minReq = $this->extractMinimumRequirement($rule);
+        if ($minReq !== null) {
+            $input['minimumRequirement'] = $minReq;
+        }
+
         // Apply discount values
         if (!$isFreeShipping) {
             $value = (float) ($rule['discount_amount'] ?? 0);
@@ -91,6 +98,9 @@ class DiscountMapper
                     'items' => ['all' => true],
                 ];
             } else {
+                if ($action !== 'by_fixed' && $action !== 'fixed') {
+                    $issues[] = "Magento action '{$action}' is mapped as a basic fixed-amount discount.";
+                }
                 // fixed
                 $input['customerGets'] = [
                     'value' => [
@@ -159,6 +169,47 @@ class DiscountMapper
             'skipped' => false,
             'skip_reason' => null,
         ];
+    }
+
+    private function extractMinimumRequirement(array $rule): ?array
+    {
+        $conditionObj = $rule['condition'] ?? null;
+        if (!is_array($conditionObj)) {
+            return null;
+        }
+
+        return $this->findSubtotalCondition($conditionObj);
+    }
+
+    private function findSubtotalCondition(array $condition): ?array
+    {
+        $type = $condition['condition_type'] ?? '';
+        if ($type === 'Magento\SalesRule\Model\Rule\Condition\Address') {
+            $attr = $condition['attribute_name'] ?? '';
+            $operator = $condition['operator'] ?? '';
+            $value = $condition['value'] ?? null;
+            if (($attr === 'base_subtotal' || $attr === 'subtotal') && ($operator === '>=' || $operator === '>') && is_numeric($value)) {
+                return [
+                    'subtotal' => [
+                        'greaterThanOrEqualToSubtotal' => number_format((float) $value, 2, '.', '')
+                    ]
+                ];
+            }
+        }
+
+        $children = $condition['conditions'] ?? [];
+        if (is_array($children)) {
+            foreach ($children as $child) {
+                if (is_array($child)) {
+                    $res = $this->findSubtotalCondition($child);
+                    if ($res !== null) {
+                        return $res;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     private function mutationInputKey(string $mutation): string

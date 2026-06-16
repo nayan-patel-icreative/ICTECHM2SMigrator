@@ -89,7 +89,7 @@ class RunDiscountMigrationJob implements ShouldQueue
                 if (! is_array($promotion)) {
                     continue;
                 }
-                $sourceId = trim((string) data_get($promotion, 'id', ''));
+                $sourceId = trim((string) data_get($promotion, 'rule_id', ''));
                 if ($sourceId === '') {
                     continue;
                 }

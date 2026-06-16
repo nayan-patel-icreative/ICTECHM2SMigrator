@@ -83,6 +83,20 @@ class ProcessDiscountMigrationItemJob implements ShouldQueue
                 return;
             }
 
+            $couponType = $promotion['coupon_type'] ?? null;
+            if ($couponType === 2 || $couponType === '2' || $couponType === 'SPECIFIC_COUPON') {
+                $coupons = $magento->fetchCouponsForRule($conn, $this->sourceId);
+                if (!empty($coupons)) {
+                    $promotion['coupon_code'] = $coupons[0]['code'] ?? '';
+                    if (isset($coupons[0]['usage_limit'])) {
+                        $promotion['uses_per_coupon'] = $coupons[0]['usage_limit'];
+                    }
+                    if (isset($coupons[0]['usage_per_customer'])) {
+                        $promotion['uses_per_customer'] = $coupons[0]['usage_per_customer'];
+                    }
+                }
+            }
+
             $promotionName = trim((string) ($promotion['name'] ?? ''));
 
 
@@ -98,9 +112,20 @@ class ProcessDiscountMigrationItemJob implements ShouldQueue
             $fp         = $fingerprints->make($promotion);
             $previousFp = $this->latestSucceededFingerprint($shop->id, $this->sourceId);
 
+            $existingGid = $this->existingShopifyGid($shop->id, $this->sourceId);
+            if ($existingGid !== null) {
+                if (!$this->checkGidExistsOnShopify($shop, $existingGid, $graphql)) {
+                    ShopifyIdMapping::query()
+                        ->where('shop_id', $shop->id)
+                        ->where('entity_type', 'discount')
+                        ->where('source_id', $this->sourceId)
+                        ->delete();
+                    $existingGid = null;
+                }
+            }
+
             if (is_string($previousFp) && $previousFp !== '' && hash_equals($previousFp, $fp)) {
                 // Only skip if the Shopify discount still exists
-                $existingGid = $this->existingShopifyGid($shop->id, $this->sourceId);
                 if ($existingGid !== null) {
                     $this->markSkipped($run, $item, $fp, $promotionName, 'No changes detected (fingerprint matched)');
 
@@ -408,7 +433,7 @@ class ProcessDiscountMigrationItemJob implements ShouldQueue
     {
         return match (true) {
             str_contains($mutation, 'AutomaticBasic')        => 'DiscountAutomaticBasicInput',
-            str_contains($mutation, 'AutomaticFreeShipping') => 'DiscountFreeShippingAutomaticInput',
+            str_contains($mutation, 'AutomaticFreeShipping') => 'DiscountAutomaticFreeShippingInput',
             str_contains($mutation, 'CodeBasic')             => 'DiscountCodeBasicInput',
             str_contains($mutation, 'CodeFreeShipping')      => 'DiscountCodeFreeShippingInput',
             default                                          => 'DiscountInput',
@@ -564,6 +589,19 @@ class ProcessDiscountMigrationItemJob implements ShouldQueue
         }
 
         $this->incrementRunCounters($run->id, ['processed' => 1, 'failed' => 1]);
+    }
+
+    private function checkGidExistsOnShopify($shop, string $gid, $graphql): bool
+    {
+        try {
+            $query = 'query($id: ID!) { node(id: $id) { id } }';
+            $res = $graphql->query($shop, $query, ['id' => $gid]);
+            $node = $res['data']['node'] ?? null;
+            return $node !== null;
+        } catch (\Throwable $e) {
+            Log::warning('Failed to check GID existence on Shopify', ['gid' => $gid, 'error' => $e->getMessage()]);
+            return false;
+        }
     }
 
     private function markSkipped(MigrationRun $run, MigrationItem $item, string $fingerprint, string $promotionName, string $reason): void

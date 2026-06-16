@@ -161,7 +161,7 @@ GQL;
             if ((string) data_get($res, 'data.metafieldDefinitions.nodes.0.id', '') === '') {
                 $create = $this->client->query($shop, $mutation, [
                     'definition' => [
-                        'name' => 'Shopware Custom ID',
+                        'name' => 'Magento Custom ID',
                         'namespace' => self::CUSTOM_ID_NAMESPACE,
                         'key' => self::CUSTOM_ID_KEY,
                         'ownerType' => 'PRODUCT',
@@ -204,7 +204,7 @@ GQL;
             } elseif ((string) data_get($variantRes, 'data.metafieldDefinitions.nodes.0.id', '') === '') {
                 $variantCreate = $this->client->query($shop, $mutation, [
                     'definition' => [
-                        'name' => 'Shopware Variant ID',
+                        'name' => 'Magento Variant ID',
                         'namespace' => 'shopware',
                         'key' => 'variant_id',
                         'ownerType' => 'PRODUCTVARIANT',
@@ -270,10 +270,10 @@ GQL;
             $definitions = [
                 ['name' => 'SEO Keywords',           'namespace' => 'shopware', 'key' => 'seo_keywords',         'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
                 ['name' => 'SEO Source Path',         'namespace' => 'shopware', 'key' => 'seo_path_source',      'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Shopware Product ID',     'namespace' => 'shopware', 'key' => 'product_id',           'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Shopware Product Number', 'namespace' => 'shopware', 'key' => 'product_number',       'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Shopware Active',         'namespace' => 'shopware', 'key' => 'active',               'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Shopware Weight (kg)',    'namespace' => 'shopware', 'key' => 'weight_kg',            'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
+                ['name' => 'Magento Product ID',     'namespace' => 'shopware', 'key' => 'product_id',           'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
+                ['name' => 'Magento Product Number', 'namespace' => 'shopware', 'key' => 'product_number',       'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
+                ['name' => 'Magento Active',         'namespace' => 'shopware', 'key' => 'active',               'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
+                ['name' => 'Magento Weight (kg)',    'namespace' => 'shopware', 'key' => 'weight_kg',            'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
                 ['name' => 'Spec Width',              'namespace' => 'shopware', 'key' => 'spec_width',           'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
                 ['name' => 'Spec Height',             'namespace' => 'shopware', 'key' => 'spec_height',          'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
                 ['name' => 'Spec Length',             'namespace' => 'shopware', 'key' => 'spec_length',          'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
@@ -291,7 +291,7 @@ GQL;
                 ['name' => 'Advanced Price Count',   'namespace' => 'shopware', 'key' => 'advanced_price_count',   'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
                 ['name' => 'Advanced Prices JSON',   'namespace' => 'shopware', 'key' => 'advanced_prices_json',   'ownerType' => 'PRODUCT', 'type' => 'json',                   'pin' => true],
                 ['name' => 'Price Mode',             'namespace' => 'shopware', 'key' => 'price_mode',             'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Shopware Download Links', 'namespace' => 'shopware', 'key' => 'download_links',       'ownerType' => 'PRODUCT', 'type' => 'list.link',              'pin' => true],
+                ['name' => 'Magento Download Links', 'namespace' => 'shopware', 'key' => 'download_links',       'ownerType' => 'PRODUCT', 'type' => 'list.link',              'pin' => true],
             ];
 
             // --- Step 1: Fetch all existing shopware-namespace definitions in one API call ---
@@ -518,7 +518,7 @@ mutation CreateDef($definition: MetafieldDefinitionInput!) {
 GQL;
 
         $definition = [
-            'name'      => 'Shopware Download Links',
+            'name'      => 'Magento Download Links',
             'namespace' => 'shopware',
             'key'       => 'download_links',
             'ownerType' => $ownerType,

@@ -136,7 +136,7 @@ class OrderPayloadMapperMethodsTest extends TestCase
 
         $this->assertCount(1, $res);
         $this->assertSame('Flat Rate - Fixed', $res[0]['title']);
-        $this->assertSame('5.00', $res[0]['originalShopityShippingRate']['priceSet']['shopMoney']['amount']);
+        $this->assertSame('5.00', $res[0]['priceSet']['shopMoney']['amount']);
     }
 
     public function test_map_order(): void
@@ -184,5 +184,116 @@ class OrderPayloadMapperMethodsTest extends TestCase
         $this->assertSame('customer@example.com', $mapped['order']['email']);
         $this->assertSame('EUR', $mapped['order']['currency']);
         $this->assertSame('100000099', $mapped['order']['name']);
+    }
+
+    public function test_map_magento_metafields(): void
+    {
+        $mapper = new OrderPayloadMapper();
+        $order = [
+            'entity_id' => 99,
+            'increment_id' => '100000099',
+            'status' => 'processing',
+            'state' => 'processing_state',
+            'payment' => [
+                'method' => 'checkmo',
+            ],
+            'shipping_description' => 'Flat Rate - Fixed',
+        ];
+
+        $metafields = $mapper->mapShopwareMetafields($order);
+
+        $this->assertIsArray($metafields);
+        
+        $byKey = [];
+        foreach ($metafields as $m) {
+            $byKey[$m['key']] = $m;
+        }
+
+        $this->assertSame('99', $byKey['order_id']['value']);
+        $this->assertSame('magento', $byKey['order_id']['namespace']);
+        $this->assertSame('100000099', $byKey['order_number']['value']);
+        $this->assertSame('processing', $byKey['status']['value']);
+        $this->assertSame('processing_state', $byKey['state']['value']);
+        $this->assertSame('checkmo', $byKey['payment_method']['value']);
+        $this->assertSame('Flat Rate - Fixed', $byKey['shipping_description']['value']);
+    }
+
+    public function test_extract_documents(): void
+    {
+        $mapper = new OrderPayloadMapper();
+        $order = [
+            'documents' => [
+                [
+                    'id' => '1',
+                    'typeKey' => 'invoice',
+                ],
+            ],
+        ];
+
+        $res = $mapper->extractDocumentsPublic($order);
+        $this->assertCount(0, $res);
+    }
+
+    public function test_map_magento_raw_document_metafields(): void
+    {
+        $mapper = new OrderPayloadMapper();
+        $order = [
+            'entity_id'        => 5,
+            'increment_id'     => '000000005',
+            'status'           => 'complete',
+            'state'            => 'complete',
+            'payment'          => ['method' => 'checkmo'],
+            'invoices_raw'     => [
+                ['entity_id' => 1, 'increment_id' => 'INV-001', 'grand_total' => 99.00],
+            ],
+            'shipments_raw'    => [
+                ['entity_id' => 2, 'increment_id' => 'SHIP-001', 'total_qty' => 1],
+            ],
+            'credit_notes_raw' => [
+                ['entity_id' => 3, 'increment_id' => 'CM-001', 'grand_total' => 10.00],
+            ],
+        ];
+
+        $metafields = $mapper->mapShopwareMetafields($order);
+        $byKey = [];
+        foreach ($metafields as $m) {
+            $byKey[$m['key']] = $m;
+        }
+
+        $this->assertArrayHasKey('invoices_json', $byKey);
+        $this->assertSame('json', $byKey['invoices_json']['type']);
+        $this->assertSame('magento', $byKey['invoices_json']['namespace']);
+        $decoded = json_decode($byKey['invoices_json']['value'], true);
+        $this->assertCount(1, $decoded);
+        $this->assertSame('INV-001', $decoded[0]['increment_id']);
+
+        $this->assertArrayHasKey('shipments_json', $byKey);
+        $decodedShip = json_decode($byKey['shipments_json']['value'], true);
+        $this->assertCount(1, $decodedShip);
+        $this->assertSame('SHIP-001', $decodedShip[0]['increment_id']);
+
+        $this->assertArrayHasKey('credit_notes_json', $byKey);
+        $decodedCn = json_decode($byKey['credit_notes_json']['value'], true);
+        $this->assertCount(1, $decodedCn);
+        $this->assertSame('CM-001', $decodedCn[0]['increment_id']);
+    }
+
+    public function test_map_magento_raw_documents_absent_when_not_fetched(): void
+    {
+        $mapper = new OrderPayloadMapper();
+        $order = [
+            'entity_id'    => 7,
+            'increment_id' => '000000007',
+            'status'       => 'pending',
+            'state'        => 'new',
+            'payment'      => ['method' => 'free'],
+        ];
+
+        $metafields = $mapper->mapShopwareMetafields($order);
+        $keys = array_column($metafields, 'key');
+
+        $this->assertNotContains('invoices_json', $keys);
+        $this->assertNotContains('shipments_json', $keys);
+        $this->assertNotContains('credit_notes_json', $keys);
     }
 }

@@ -94,6 +94,12 @@ class OrderPayloadMapper
         $note = implode("\n", array_values(array_filter($noteParts)));
 
         $processedAt = (string) ($order['created_at'] ?? '');
+        if ($processedAt !== '') {
+            $dt = \DateTime::createFromFormat('Y-m-d H:i:s', $processedAt) ?: new \DateTime($processedAt);
+            if ($dt) {
+                $processedAt = $dt->format(\DateTime::ATOM);
+            }
+        }
 
         $customerGid = $this->resolveShopifyCustomerGid($shop, $order);
 
@@ -145,8 +151,12 @@ class OrderPayloadMapper
             $payload['financialStatus'] = 'PENDING';
         } else {
             $transactions[] = [
-                'amount' => $this->formatAmount((float) ($order['grand_total'] ?? 0)),
-                'currencyCode' => $currency,
+                'amountSet' => [
+                    'shopMoney' => [
+                        'amount' => $this->formatAmount((float) ($order['grand_total'] ?? 0)),
+                        'currencyCode' => $currency,
+                    ],
+                ],
                 'gateway' => $paymentMethod !== '' ? $paymentMethod : 'manual',
                 'kind' => 'SALE',
                 'status' => 'SUCCESS',
@@ -264,12 +274,10 @@ class OrderPayloadMapper
         return [
             [
                 'title' => $title !== '' ? $title : 'Shipping',
-                'originalShopityShippingRate' => [
-                    'priceSet' => [
-                        'shopMoney' => [
-                            'amount' => $this->formatAmount($shippingAmount),
-                            'currencyCode' => $currency,
-                        ],
+                'priceSet' => [
+                    'shopMoney' => [
+                        'amount' => $this->formatAmount($shippingAmount),
+                        'currencyCode' => $currency,
                     ],
                 ],
             ]
@@ -312,12 +320,92 @@ class OrderPayloadMapper
             ];
         }
 
+        $status = (string) ($order['status'] ?? '');
+        if ($status !== '') {
+            $out[] = [
+                'namespace' => 'magento',
+                'key' => 'status',
+                'type' => 'single_line_text_field',
+                'value' => $status,
+            ];
+        }
+
+        $state = (string) ($order['state'] ?? '');
+        if ($state !== '') {
+            $out[] = [
+                'namespace' => 'magento',
+                'key' => 'state',
+                'type' => 'single_line_text_field',
+                'value' => $state,
+            ];
+        }
+
+        $paymentMethod = (string) ($order['payment']['method'] ?? '');
+        if ($paymentMethod !== '') {
+            $out[] = [
+                'namespace' => 'magento',
+                'key' => 'payment_method',
+                'type' => 'single_line_text_field',
+                'value' => $paymentMethod,
+            ];
+        }
+
+        $shippingDesc = (string) ($order['shipping_description'] ?? '');
+        if ($shippingDesc !== '') {
+            $out[] = [
+                'namespace' => 'magento',
+                'key' => 'shipping_description',
+                'type' => 'single_line_text_field',
+                'value' => $shippingDesc,
+            ];
+        }
+
         $out[] = [
             'namespace' => 'magento',
             'key' => 'raw_json',
             'type' => 'json',
             'value' => $rawJson,
         ];
+
+        // Raw invoice, shipment, and credit note JSON from Magento REST API
+        $invoicesRaw = $order['invoices_raw'] ?? [];
+        if (is_array($invoicesRaw) && count($invoicesRaw) > 0) {
+            $invoicesJson = json_encode(array_values($invoicesRaw), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if (is_string($invoicesJson)) {
+                $out[] = [
+                    'namespace' => 'magento',
+                    'key'       => 'invoices_json',
+                    'type'      => 'json',
+                    'value'     => $invoicesJson,
+                ];
+            }
+        }
+
+        $shipmentsRaw = $order['shipments_raw'] ?? [];
+        if (is_array($shipmentsRaw) && count($shipmentsRaw) > 0) {
+            $shipmentsJson = json_encode(array_values($shipmentsRaw), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if (is_string($shipmentsJson)) {
+                $out[] = [
+                    'namespace' => 'magento',
+                    'key'       => 'shipments_json',
+                    'type'      => 'json',
+                    'value'     => $shipmentsJson,
+                ];
+            }
+        }
+
+        $creditNotesRaw = $order['credit_notes_raw'] ?? [];
+        if (is_array($creditNotesRaw) && count($creditNotesRaw) > 0) {
+            $creditNotesJson = json_encode(array_values($creditNotesRaw), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if (is_string($creditNotesJson)) {
+                $out[] = [
+                    'namespace' => 'magento',
+                    'key'       => 'credit_notes_json',
+                    'type'      => 'json',
+                    'value'     => $creditNotesJson,
+                ];
+            }
+        }
 
         return $out;
     }

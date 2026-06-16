@@ -197,9 +197,9 @@ class ProcessProductMigrationItemJob implements ShouldQueue
                         $item->save();
 
                         $reportWriter->appendRow($run, [
-                            'shopware_product_id' => $item->source_id,
-                            'product_number' => (string) data_get($parent, 'productNumber', ''),
-                            'product_name' => (string) (data_get($parent, 'translated.name') ?: data_get($parent, 'name') ?: ''),
+                            'magento_product_id' => $item->source_id,
+                            'product_number' => (string) data_get($parent, 'sku', ''),
+                            'product_name' => (string) data_get($parent, 'name', ''),
                             'variant_count' => count(is_array($children) ? $children : []),
                             'status' => 'skipped',
                             'reason' => 'No changes detected (fingerprint matched existing Shopify product)',
@@ -712,9 +712,9 @@ class ProcessProductMigrationItemJob implements ShouldQueue
             $item->save();
 
             $reportWriter->appendRow($run, [
-                'shopware_product_id' => $item->source_id,
-                'product_number' => (string) data_get($parent, 'productNumber', ''),
-                'product_name' => (string) (data_get($parent, 'translated.name') ?: data_get($parent, 'name') ?: ''),
+                'magento_product_id' => $item->source_id,
+                'product_number' => (string) data_get($parent, 'sku', ''),
+                'product_name' => (string) data_get($parent, 'name', ''),
                 'variant_count' => $variantCountForReport,
                 'status' => 'succeeded',
                 'reason' => '',
@@ -798,7 +798,7 @@ class ProcessProductMigrationItemJob implements ShouldQueue
             $shopifyProductId = is_string($item->shopify_gid) ? $item->shopify_gid : '';
 
             $reportWriter->appendRow($runId, [
-                'shopware_product_id' => $item->source_id,
+                'magento_product_id' => $item->source_id,
                 'product_number' => $productNumber,
                 'product_name' => $productName,
                 'variant_count' => $variantCountForReport,

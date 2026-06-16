@@ -67,7 +67,7 @@ class ProcessOrderMigrationItemJob implements ShouldQueue
             return;
         }
 
-        $sourceId = (string) ($this->order['id'] ?? '');
+        $sourceId = (string) ($this->order['entity_id'] ?? $this->order['id'] ?? '');
         $sourceId = trim($sourceId);
         if ($sourceId === '') {
             return;
@@ -101,9 +101,13 @@ class ProcessOrderMigrationItemJob implements ShouldQueue
 
         try {
             $order = $this->order;
+
+            // Fetch supplementary Magento data (invoices, shipments, credit memos) if connected
             if ($shop->magentoConnection) {
-                // Magento orders are fully self-contained from API.
+                $order = $this->enrichOrderWithMagentoData($shop, $order);
             }
+
+            $sync->ensureOrderDocumentMetafieldDefinitions($shop);
 
             $locationGid = app(MigrationLocationResolver::class)->resolveForRun($run, $shop);
             $mapped = $mapper->mapOrder($shop, $order, $locationGid);
@@ -194,9 +198,6 @@ class ProcessOrderMigrationItemJob implements ShouldQueue
                     $this->markFailed($run, $item, 'Shopify metadata update failed', $update);
                     return;
                 }
-
-                // Upload documents and update metafields/custom attributes with CDN URLs
-                $this->syncOrderDocuments($shop, $sync, $mapper, $order, $existingOrderGid, $run->id, $sourceId);
 
                 $item->status     = 'succeeded';
                 $item->fingerprint = $fp;
@@ -471,10 +472,6 @@ class ProcessOrderMigrationItemJob implements ShouldQueue
             $item->fingerprint = $fp;
             $item->save();
 
-            // Upload Shopware order documents (invoices, delivery notes, etc.) to Shopify Files
-            // and update custom attributes + metafields with the Shopify CDN URLs. Non-fatal.
-            $this->syncOrderDocuments($shop, $sync, $mapper, $order, $orderGid, $run->id, $sourceId);
-
             // Defer metadata syncing to reduce Shopify throttling impact.
             // This job uses orderGid+sourceId, so metadata cannot attach to the wrong order.
             if (count($tags) > 0 || (is_array($metafields) && count($metafields) > 0) || is_array($customAttributes)) {
@@ -546,146 +543,58 @@ class ProcessOrderMigrationItemJob implements ShouldQueue
     }
 
     /**
-     * Upload Shopware order documents to Shopify Files and update order metafields/custom attributes.
-     * Non-fatal — called from both the create path and the update path.
+     * Enrich an order array with raw invoice, shipment, and credit memo data
+     * fetched from the Magento REST API. Each result is stored under a dedicated
+     * key so the payload mapper can write them as JSON metafields.
+     * Non-fatal — if any sub-request fails the key simply stays absent.
+     *
+     * @param array<string, mixed> $order
+     * @return array<string, mixed>
      */
-    private function syncOrderDocuments(
-        \App\Models\Shop $shop,
-        ShopifyOrderSyncService $sync,
-        OrderPayloadMapper $mapper,
-        array $order,
-        string $orderGid,
-        int $runId,
-        string $sourceId
-    ): void {
-        $documents = data_get($order, 'documents', []);
-        if (!is_array($documents) || count($documents) === 0 || !$shop->magentoConnection) {
-            return;
-        }
-
-        try {
-            $docSync = app(ShopifyOrderDocumentSyncService::class);
-            $shopwareToken = (string) ($shop->magentoConnection->access_token ?? '');
-            $rawDocs = $mapper->extractDocumentsPublic($order);
-            $uploadedDocs = $docSync->uploadDocuments($shop, $rawDocs, $shopwareToken);
-
-            foreach ($uploadedDocs as $doc) {
-                if (empty($doc['shopifyFileUrl']) && !empty($doc['downloadUrl'])) {
-                    Log::warning('Order document failed to upload to Shopify Files', [
-                        'shop'                 => $shop->shop_domain,
-                        'source_id'            => $sourceId,
-                        'document_id'          => $doc['id'],
-                        'document_type'        => $doc['typeName'],
-                        'shopware_download_url' => $doc['downloadUrl'],
-                    ]);
-                }
-            }
-
-            if (count($uploadedDocs) === 0) {
-                return;
-            }
-
-            // Ensure url-type metafield definitions exist (renders as clickable links in Shopify Admin)
-            $sync->ensureOrderDocumentMetafieldDefinitions($shop);
-
-            // Build metafields: documents_json + individual url metafields per document
-            $docMetafields = [];
-
-            $docsJson = json_encode(array_values($uploadedDocs), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-            if (is_string($docsJson)) {
-                $docMetafields[] = ['namespace' => 'shopware', 'key' => 'documents_json', 'type' => 'json', 'value' => $docsJson];
-            }
-
-            $docIndex = [];
-            foreach ($uploadedDocs as $doc) {
-                $fileUrl = (string) ($doc['shopifyFileUrl'] ?? '');
-                if ($fileUrl === '') {
-                    continue;
-                }
-                $typeKey = (string) ($doc['typeKey'] ?? 'document');
-                $docIndex[$typeKey] = ($docIndex[$typeKey] ?? 0) + 1;
-                $suffix  = $docIndex[$typeKey] > 1 ? '_' . $docIndex[$typeKey] : '';
-                // Use fixed predictable key mapping — must match definitions in ensureOrderDocumentMetafieldDefinitions
-                $metaKey = $this->documentTypeToMetaKey($typeKey) . $suffix . '_url';
-                $docMetafields[] = ['namespace' => 'shopware_docs', 'key' => $metaKey, 'type' => 'url', 'value' => $fileUrl];
-            }
-
-            if (count($docMetafields) > 0) {
-                $sync->setOrderMetafields($shop, $orderGid, $docMetafields);
-            }
-
-            // Custom attributes: show number+date AND CDN URL (clickable in Additional details)
-            // Remove old "Download" localhost entries
-            $docCustomAttrs = [];
-            $byType = [];
-            foreach ($uploadedDocs as $doc) {
-                $byType[(string) ($doc['typeKey'] ?? 'document')][] = $doc;
-            }
-            foreach ($byType as $typeKey => $docs) {
-                $typeName = (string) ($docs[0]['typeName'] ?? ucwords(str_replace('_', ' ', $typeKey)));
-                foreach ($docs as $i => $doc) {
-                    $suffix   = count($docs) > 1 ? ' ' . ($i + 1) : '';
-                    $label    = 'Shopware ' . $typeName . $suffix;
-                    $docNum   = (string) ($doc['documentNumber'] ?? '');
-                    $date     = (string) ($doc['createdAt'] ?? '');
-                    $datePart = $date !== '' ? ' (' . substr($date, 0, 10) . ')' : '';
-                    $fileUrl  = (string) ($doc['shopifyFileUrl'] ?? '');
-
-                    // If we have a CDN URL, use it as the value so it's clickable in Additional details
-                    if ($fileUrl !== '') {
-                        $value = $fileUrl;
-                    } else {
-                        $value = ($docNum !== '' ? '#' . $docNum : '') . $datePart;
-                    }
-
-                    if ($value !== '') {
-                        $docCustomAttrs[] = ['key' => substr($label, 0, 255), 'value' => substr($value, 0, 255)];
-                    }
-                    // Empty value = delete old "Download" key from previous runs
-                    $docCustomAttrs[] = ['key' => substr($label . ' Download', 0, 255), 'value' => ''];
-                }
-            }
-            if (count($docCustomAttrs) > 0) {
-                $sync->updateOrderMetadata($shop, $orderGid, [], [], $docCustomAttrs);
-            }
-        } catch (\Throwable $e) {
-            Log::warning('Order document sync failed (order still migrated)', [
-                'run_id'    => $runId,
-                'shop'      => $shop->shop_domain,
-                'source_id' => $sourceId,
-                'order_gid' => $orderGid,
-                'error'     => $e->getMessage(),
-            ]);
-        }
-    }
-
-    /**
-     * Map Shopware document typeKey to a fixed, predictable Shopify metafield key.
-     * Keys must be ≤ 30 chars, lowercase, underscores only.
-     * These MUST match the keys in ShopifyOrderSyncService::ensureOrderDocumentMetafieldDefinitions().
-     */
-    private function documentTypeToMetaKey(string $typeKey): string
+    private function enrichOrderWithMagentoData(\App\Models\Shop $shop, array $order): array
     {
-        $map = [
-            'invoice'                                    => 'invoice',
-            'delivery_note'                              => 'delivery_note',
-            'credit_note'                                => 'credit_note',
-            'cancellation_invoice'                       => 'cancellation_invoice',
-            'invoice_pdf_with_embedded_zugferd_einvoice' => 'invoice_zugferd_pdf',
-            'zugferd_embedded_invoice'                   => 'invoice_zugferd_pdf',
-            'invoice_pdf_with_zugferd'                   => 'invoice_zugferd_pdf',
-            'invoice_zugferd_einvoice'                   => 'invoice_zugferd_xml',
-            'zugferd_einvoice'                           => 'invoice_zugferd_xml',
-            'zugferd_xml'                                => 'invoice_zugferd_xml',
-            'storno_bill'                                => 'storno_bill',
+        $magento  = app(MagentoClient::class);
+        $conn     = $shop->magentoConnection;
+        $orderId  = (string) ($order['entity_id'] ?? '');
+
+        if ($orderId === '' || !$conn) {
+            return $order;
+        }
+
+        $searchFilter = [
+            'searchCriteria[filterGroups][0][filters][0][field]'         => 'order_id',
+            'searchCriteria[filterGroups][0][filters][0][value]'         => $orderId,
+            'searchCriteria[filterGroups][0][filters][0][conditionType]' => 'eq',
         ];
 
-        // Normalize the typeKey for lookup
-        $normalized = strtolower(preg_replace('/[^a-z0-9]/i', '_', $typeKey) ?? '');
-        $normalized = preg_replace('/_+/', '_', $normalized) ?? $normalized;
-        $normalized = trim($normalized, '_');
+        // 1. Invoices
+        try {
+            $res = $magento->request($conn, 'GET', '/V1/invoices', ['query' => $searchFilter]);
+            $order['invoices_raw'] = $res['items'] ?? [];
+        } catch (\Throwable $e) {
+            Log::warning('Failed to fetch Magento invoices for order ' . $orderId, ['error' => $e->getMessage()]);
+            $order['invoices_raw'] = [];
+        }
 
-        return $map[$normalized] ?? substr($normalized, 0, 26);
+        // 2. Shipments (delivery notes)
+        try {
+            $res = $magento->request($conn, 'GET', '/V1/shipments', ['query' => $searchFilter]);
+            $order['shipments_raw'] = $res['items'] ?? [];
+        } catch (\Throwable $e) {
+            Log::warning('Failed to fetch Magento shipments for order ' . $orderId, ['error' => $e->getMessage()]);
+            $order['shipments_raw'] = [];
+        }
+
+        // 3. Credit memos (credit notes)
+        try {
+            $res = $magento->request($conn, 'GET', '/V1/creditmemos', ['query' => $searchFilter]);
+            $order['credit_notes_raw'] = $res['items'] ?? [];
+        } catch (\Throwable $e) {
+            Log::warning('Failed to fetch Magento creditmemos for order ' . $orderId, ['error' => $e->getMessage()]);
+            $order['credit_notes_raw'] = [];
+        }
+
+        return $order;
     }
 
     private function markFailed(MigrationRun $run, MigrationItem $item, string $message, array $context): void

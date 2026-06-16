@@ -23,51 +23,22 @@ class ShopifyOrderSyncService
      */
     public function ensureOrderDocumentMetafieldDefinitions(Shop $shop): array
     {
-        $cacheKey = 'shopify:order_doc_metafields_ensured_v5:' . $shop->id;
+        $cacheKey = 'shopify:order_doc_metafields_ensured_v8:' . $shop->id;
         if (\Illuminate\Support\Facades\Cache::get($cacheKey)) {
             return ['ok' => true];
         }
 
-        // shopware_docs namespace — document URL metafields (rendered as clickable links)
-        $shopwareDocsDefinitions = [
-            ['name' => 'Invoice URL',              'namespace' => 'shopware_docs', 'key' => 'invoice_url',              'ownerType' => 'ORDER', 'type' => 'url'],
-            ['name' => 'Delivery Note URL',        'namespace' => 'shopware_docs', 'key' => 'delivery_note_url',        'ownerType' => 'ORDER', 'type' => 'url'],
-            ['name' => 'Credit Note URL',          'namespace' => 'shopware_docs', 'key' => 'credit_note_url',          'ownerType' => 'ORDER', 'type' => 'url'],
-            ['name' => 'Cancellation Invoice URL', 'namespace' => 'shopware_docs', 'key' => 'cancellation_invoice_url', 'ownerType' => 'ORDER', 'type' => 'url'],
-            ['name' => 'Invoice ZUGFeRD PDF URL',  'namespace' => 'shopware_docs', 'key' => 'invoice_zugferd_pdf_url',  'ownerType' => 'ORDER', 'type' => 'url'],
-            ['name' => 'Invoice ZUGFeRD XML URL',  'namespace' => 'shopware_docs', 'key' => 'invoice_zugferd_xml_url',  'ownerType' => 'ORDER', 'type' => 'url'],
-            ['name' => 'Storno Bill URL',          'namespace' => 'shopware_docs', 'key' => 'storno_bill_url',          'ownerType' => 'ORDER', 'type' => 'url'],
-        ];
-
-        // shopware namespace — user-visible order metadata. Total: 12
-        // Intentionally excluded from pin list (raw/technical, not useful in UI):
-        //   payment_method_id, shipping_method_id (internal UUIDs)
-        //   documents_json, raw_json (raw JSON blobs)
-        $shopwareDefinitions = [
-            ['name' => 'Shopware Order Number',            'namespace' => 'shopware', 'key' => 'order_number',             'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
-            ['name' => 'Shopware Order ID',                'namespace' => 'shopware', 'key' => 'order_id',                 'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
-            ['name' => 'Shopware Payment Method',          'namespace' => 'shopware', 'key' => 'payment_method_name',      'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
-            ['name' => 'Shopware Payment Method Mapped',   'namespace' => 'shopware', 'key' => 'payment_method_mapped',    'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
-            ['name' => 'Shopware Shipping Method',         'namespace' => 'shopware', 'key' => 'shipping_method_name',     'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
-            ['name' => 'Shopware Shipping Method Mapped',  'namespace' => 'shopware', 'key' => 'shipping_method_mapped',   'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
-            ['name' => 'Shopware Order State',             'namespace' => 'shopware', 'key' => 'order_state',              'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
-            ['name' => 'Shopware Order State Mapped',      'namespace' => 'shopware', 'key' => 'order_state_mapped',       'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
-            ['name' => 'Shopware Transaction State',       'namespace' => 'shopware', 'key' => 'transaction_state',        'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
-            ['name' => 'Shopware Transaction State Mapped','namespace' => 'shopware', 'key' => 'transaction_state_mapped', 'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
-            ['name' => 'Shopware Delivery State',          'namespace' => 'shopware', 'key' => 'delivery_state',           'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
-            ['name' => 'Shopware Delivery State Mapped',   'namespace' => 'shopware', 'key' => 'delivery_state_mapped',    'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
-        ];
-
-        // Keys to UNPIN to free slots (orphans / internal-only fields that consumed pin slots).
-        // Shopify enforces a hard limit of 20 pinned definitions per ownerType.
-        $unpinKeys = [
-            'shopware_docs' => [
-                'invoice__pdf_with_embedded_zugferd_e_url', // orphan/misnamed legacy key
-            ],
-            'shopware' => [
-                'payment_method_id',  // internal UUID — not useful in the UI
-                'shipping_method_id', // internal UUID — not useful in the UI
-            ],
+        // magento namespace — user-visible order metadata
+        $magentoDefinitions = [
+            ['name' => 'Magento Order Number',         'namespace' => 'magento', 'key' => 'order_number',         'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
+            ['name' => 'Magento Order ID',             'namespace' => 'magento', 'key' => 'order_id',             'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
+            ['name' => 'Magento Status',               'namespace' => 'magento', 'key' => 'status',               'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
+            ['name' => 'Magento State',                'namespace' => 'magento', 'key' => 'state',                'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
+            ['name' => 'Magento Payment Method',       'namespace' => 'magento', 'key' => 'payment_method',       'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
+            ['name' => 'Magento Shipping Description', 'namespace' => 'magento', 'key' => 'shipping_description', 'ownerType' => 'ORDER', 'type' => 'single_line_text_field'],
+            ['name' => 'Magento Invoices',             'namespace' => 'magento', 'key' => 'invoices_json',        'ownerType' => 'ORDER', 'type' => 'json'],
+            ['name' => 'Magento Shipments',            'namespace' => 'magento', 'key' => 'shipments_json',       'ownerType' => 'ORDER', 'type' => 'json'],
+            ['name' => 'Magento Credit Notes',         'namespace' => 'magento', 'key' => 'credit_notes_json',    'ownerType' => 'ORDER', 'type' => 'json'],
         ];
 
         $existingQuery = <<<'GQL'
@@ -96,28 +67,68 @@ mutation PinDef($id: ID!) {
 }
 GQL;
 
-        $unpinMutation = <<<'GQL'
-mutation UnpinDef($id: ID!) {
-  metafieldDefinitionUnpin(definitionId: $id) {
-    unpinnedDefinition { id pinnedPosition }
+        $deleteMutation = <<<'GQL'
+mutation DeleteDef($id: ID!, $deleteAllAssociatedMetafields: Boolean) {
+  metafieldDefinitionDelete(id: $id, deleteAllAssociatedMetafields: $deleteAllAssociatedMetafields) {
+    deletedDefinitionId
     userErrors { field message }
   }
 }
 GQL;
 
-        // Process both namespace groups
+        // Step 1: Clean up legacy namespaces
+        $legacyNamespaces = ['shopware', 'shopware_docs', 'magento_docs'];
+        foreach ($legacyNamespaces as $legacyNs) {
+            try {
+                $legacyRes = $this->client->query($shop, $existingQuery, ['namespace' => $legacyNs]);
+                $legacyNodes = data_get($legacyRes, 'data.metafieldDefinitions.nodes', []);
+                if (is_array($legacyNodes)) {
+                    foreach ($legacyNodes as $node) {
+                        $defId = $node['id'] ?? '';
+                        if ($defId !== '') {
+                            $this->client->query($shop, $deleteMutation, [
+                                'id' => $defId,
+                                'deleteAllAssociatedMetafields' => true,
+                            ]);
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Non-blocking cleanup
+            }
+        }
+
+        // Clean up documents_json in magento namespace if it exists
+        try {
+            $magentoRes = $this->client->query($shop, $existingQuery, ['namespace' => 'magento']);
+            $magentoNodes = data_get($magentoRes, 'data.metafieldDefinitions.nodes', []);
+            if (is_array($magentoNodes)) {
+                foreach ($magentoNodes as $node) {
+                    if (($node['key'] ?? '') === 'documents_json') {
+                        $defId = $node['id'] ?? '';
+                        if ($defId !== '') {
+                            $this->client->query($shop, $deleteMutation, [
+                                'id' => $defId,
+                                'deleteAllAssociatedMetafields' => true,
+                            ]);
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Non-blocking cleanup
+        }
+
+        // Step 2: Create and pin Magento definitions
         $namespaceGroups = [
-            'shopware_docs' => $shopwareDocsDefinitions,
-            'shopware'      => $shopwareDefinitions,
+            'magento' => $magentoDefinitions,
         ];
 
         foreach ($namespaceGroups as $namespace => $definitions) {
-            // Fetch existing definitions for this namespace
             $existingRes   = $this->client->query($shop, $existingQuery, ['namespace' => $namespace]);
             $existingNodes = data_get($existingRes, 'data.metafieldDefinitions.nodes', []);
             $existingNodes = is_array($existingNodes) ? $existingNodes : [];
 
-            // Build map: key => {id, pinned}
             $existingMap = [];
             foreach ($existingNodes as $node) {
                 $k = (string) ($node['key'] ?? '');
@@ -129,33 +140,20 @@ GQL;
                 }
             }
 
-            // Step 1: Unpin low-value/orphan definitions to free up pin slots
-            // (Shopify enforces a hard limit of 20 pinned definitions per ownerType)
-            foreach (($unpinKeys[$namespace] ?? []) as $unpinKey) {
-                $entry = $existingMap[$unpinKey] ?? null;
-                if ($entry && $entry['pinned'] && $entry['id'] !== '') {
-                    $this->client->query($shop, $unpinMutation, ['id' => $entry['id']]);
-                }
-            }
-
-            // Step 2: Create and pin the canonical definitions
             foreach ($definitions as $definition) {
                 $key      = (string) ($definition['key'] ?? '');
                 $existing = $existingMap[$key] ?? null;
 
                 if ($existing !== null) {
-                    // Definition already exists — pin it if not already pinned
                     if (!$existing['pinned'] && $existing['id'] !== '') {
                         $this->client->query($shop, $pinMutation, ['id' => $existing['id']]);
                     }
                 } else {
-                    // Create new definition (MetafieldDefinitionInput does not accept a 'pin' field)
                     $res = $this->client->query($shop, $createMutation, ['definition' => $definition]);
                     if (isset($res['errors'])) {
                         continue;
                     }
                     $createdId = (string) data_get($res, 'data.metafieldDefinitionCreate.createdDefinition.id', '');
-                    // Explicitly pin after creation
                     if ($createdId !== '') {
                         $this->client->query($shop, $pinMutation, ['id' => $createdId]);
                     }

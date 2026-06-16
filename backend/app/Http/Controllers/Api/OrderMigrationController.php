@@ -69,7 +69,7 @@ class OrderMigrationController extends Controller
 
         $items = [];
         foreach (array_slice($orders, 0, $limit) as $o) {
-            $sourceId = (string) ($o['id'] ?? '');
+            $sourceId = (string) ($o['entity_id'] ?? $o['id'] ?? '');
             if ($sourceId === '') {
                 continue;
             }
@@ -80,9 +80,9 @@ class OrderMigrationController extends Controller
 
             $out = [
                 'source_id' => $sourceId,
-                'order_number' => (string) data_get($o, 'orderNumber', ''),
+                'order_number' => (string) ($o['increment_id'] ?? $o['orderNumber'] ?? ''),
                 'email' => (string) data_get($payload, 'email', ''),
-                'amount_total' => data_get($o, 'amountTotal'),
+                'amount_total' => data_get($o, 'grand_total') ?? data_get($o, 'amountTotal'),
                 'currency' => (string) data_get($payload, 'currency', ''),
                 'line_items_count' => is_array(data_get($payload, 'lineItems')) ? count((array) data_get($payload, 'lineItems')) : 0,
                 'fingerprint' => $fp,
@@ -91,7 +91,7 @@ class OrderMigrationController extends Controller
             if ($includePayload) {
                 $out['payload'] = $payload;
                 $out['shopware_metafields'] = [];
-                $out['shopware_raw'] = $mapped['shopware_raw'];
+                $out['shopware_raw'] = $mapped['magento_raw'] ?? [];
             }
 
             $items[] = $out;
@@ -140,7 +140,7 @@ class OrderMigrationController extends Controller
 
         $items = [];
         foreach (array_slice($orders, 0, $limit) as $o) {
-            $sourceId = (string) ($o['id'] ?? '');
+            $sourceId = (string) ($o['entity_id'] ?? $o['id'] ?? '');
             if ($sourceId === '') {
                 continue;
             }
@@ -151,9 +151,9 @@ class OrderMigrationController extends Controller
 
             $out = [
                 'source_id' => $sourceId,
-                'order_number' => (string) data_get($o, 'orderNumber', ''),
+                'order_number' => (string) ($o['increment_id'] ?? $o['orderNumber'] ?? ''),
                 'email' => (string) data_get($payload, 'email', ''),
-                'amount_total' => data_get($o, 'amountTotal'),
+                'amount_total' => data_get($o, 'grand_total') ?? data_get($o, 'amountTotal'),
                 'currency' => (string) data_get($payload, 'currency', ''),
                 'line_items_count' => is_array(data_get($payload, 'lineItems')) ? count((array) data_get($payload, 'lineItems')) : 0,
                 'fingerprint' => $fp,
@@ -162,7 +162,7 @@ class OrderMigrationController extends Controller
             if ($includePayload) {
                 $out['payload'] = $payload;
                 $out['shopware_metafields'] = [];
-                $out['shopware_raw'] = $mapped['shopware_raw'];
+                $out['shopware_raw'] = $mapped['magento_raw'] ?? [];
             }
 
             $items[] = $out;
@@ -330,13 +330,12 @@ class OrderMigrationController extends Controller
             }
 
             $gte = CarbonImmutable::createFromFormat('Y-m-d', $after)
-                ->addDay()
                 ->startOfDay()
-                ->toIso8601String();
+                ->toDateTimeString();
             return [[
-                'type' => 'range',
-                'field' => 'orderDateTime',
-                'parameters' => ['gte' => $gte],
+                'field' => 'created_at',
+                'type' => 'greater_than_equals',
+                'value' => $gte,
             ]];
         }
 
@@ -351,16 +350,22 @@ class OrderMigrationController extends Controller
                 return ['error' => 'The after date must be before or equal to the before date'];
             }
 
-            return [[
-                'type' => 'range',
-                'field' => 'orderDateTime',
-                'parameters' => [
-                    'gte' => $from->toIso8601String(),
-                    'lte' => $to->toIso8601String(),
+            return [
+                [
+                    'field' => 'created_at',
+                    'type' => 'greater_than_equals',
+                    'value' => $from->toDateTimeString(),
                 ],
-            ]];
+                [
+                    'field' => 'created_at',
+                    'type' => 'less_than_equals',
+                    'value' => $to->toDateTimeString(),
+                ]
+            ];
         }
 
         return ['error' => 'Invalid mode'];
     }
+
 }
+

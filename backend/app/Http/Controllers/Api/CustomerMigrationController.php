@@ -301,13 +301,12 @@ class CustomerMigrationController extends Controller
             }
 
             $gte = CarbonImmutable::createFromFormat('Y-m-d', $after)
-                ->addDay()
                 ->startOfDay()
-                ->toIso8601String();
+                ->toDateTimeString();
             return [[
-                'type' => 'range',
-                'field' => 'createdAt',
-                'parameters' => ['gte' => $gte],
+                'field' => 'created_at',
+                'type' => 'greater_than_equals',
+                'value' => $gte,
             ]];
         }
 
@@ -315,11 +314,11 @@ class CustomerMigrationController extends Controller
             if (!$before) {
                 return ['error' => 'The before date is required for mode=before'];
             }
-            $lte = CarbonImmutable::createFromFormat('Y-m-d', $before)->endOfDay()->toIso8601String();
+            $lte = CarbonImmutable::createFromFormat('Y-m-d', $before)->endOfDay()->toDateTimeString();
             return [[
-                'type' => 'range',
-                'field' => 'createdAt',
-                'parameters' => ['lte' => $lte],
+                'field' => 'created_at',
+                'type' => 'less_than_equals',
+                'value' => $lte,
             ]];
         }
 
@@ -334,14 +333,18 @@ class CustomerMigrationController extends Controller
                 return ['error' => 'The after date must be before or equal to the before date'];
             }
 
-            return [[
-                'type' => 'range',
-                'field' => 'createdAt',
-                'parameters' => [
-                    'gte' => $from->toIso8601String(),
-                    'lte' => $to->toIso8601String(),
+            return [
+                [
+                    'field' => 'created_at',
+                    'type' => 'greater_than_equals',
+                    'value' => $from->toDateTimeString(),
                 ],
-            ]];
+                [
+                    'field' => 'created_at',
+                    'type' => 'less_than_equals',
+                    'value' => $to->toDateTimeString(),
+                ]
+            ];
         }
 
         return ['error' => 'Invalid mode'];

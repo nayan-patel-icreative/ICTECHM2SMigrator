@@ -188,7 +188,7 @@ class MigrationRunReportWriter
     {
         return match ($type) {
             'products' => [
-                'shopware_product_id',
+                'magento_product_id',
                 'product_number',
                 'product_name',
                 'variant_count',
@@ -198,7 +198,7 @@ class MigrationRunReportWriter
                 'migrated_at_utc',
             ],
             'manufacturers' => [
-                'shopware_manufacturer_id',
+                'magento_manufacturer_id',
                 'manufacturer_name',
                 'status',
                 'reason',
@@ -206,15 +206,15 @@ class MigrationRunReportWriter
                 'migrated_at_utc',
             ],
             'markets' => [
-                'shopware_sales_channel_id',
-                'sales_channel_name',
+                'magento_store_view_id',
+                'store_view_name',
                 'status',
                 'reason',
                 'shopify_market_gid',
                 'migrated_at_utc',
             ],
             'customers' => [
-                'shopware_customer_id',
+                'magento_customer_id',
                 'email',
                 'status',
                 'reason',
@@ -222,7 +222,7 @@ class MigrationRunReportWriter
                 'migrated_at_utc',
             ],
             'orders' => [
-                'shopware_order_id',
+                'magento_order_id',
                 'order_number',
                 'status',
                 'reason',
@@ -236,7 +236,7 @@ class MigrationRunReportWriter
                 'migrated_at_utc',
             ],
             'discounts' => [
-                'shopware_promotion_id',
+                'magento_promotion_id',
                 'promotion_name',
                 'shopify_discount_type',
                 'shopify_discount_gid',
@@ -265,7 +265,7 @@ class MigrationRunReportWriter
         $rows = [];
 
         $rows[] = '# ======================================';
-        $rows[] = '# ICTECHS2SMigrator Migration Report';
+        $rows[] = '# ICTECHM2SMigrator Migration Report';
         $rows[] = '# ======================================';
         $rows[] = '# migration_run_id=' . $run->id;
         $rows[] = '# migration_type=' . $run->type;

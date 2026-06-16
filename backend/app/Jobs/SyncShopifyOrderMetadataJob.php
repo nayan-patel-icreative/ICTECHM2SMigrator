@@ -61,7 +61,7 @@ class SyncShopifyOrderMetadataJob implements ShouldQueue
             return;
         }
 
-        if (in_array($run->status, ['cancelled', 'finished', 'failed'], true)) {
+        if ($run->status === 'cancelled') {
             return;
         }
 

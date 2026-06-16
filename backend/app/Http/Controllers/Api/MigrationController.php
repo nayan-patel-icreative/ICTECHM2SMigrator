@@ -656,17 +656,155 @@ class MigrationController extends Controller
         $limit      = (int) ($validated['limit'] ?? 5);
         $page       = (int) ($validated['page'] ?? 1);
         $locationGid = (string) $validated['location_gid'];
+        $includePayload = (bool) ($validated['include_payload'] ?? false);
 
         $magento = app(MagentoClient::class);
+        $mapper = app(ProductPayloadMapper::class);
+        $fingerprints = app(ProductFingerprint::class);
 
         $res      = $magento->searchProducts($conn, 50, $page, $filter);
         $products = $res['products'] ?? [];
         $total    = (int) ($res['total'] ?? 0);
 
+        if (!is_array($products) || count($products) === 0) {
+            return response()->json([
+                'page'  => $page,
+                'total' => $total,
+                'items' => [],
+            ]);
+        }
+
+        $parents = array_values(array_filter($products, function ($p) {
+            return ($p['visibility'] ?? 4) !== 1;
+        }));
+
+        $items = [];
+        foreach (array_slice($parents, 0, $limit) as $p) {
+            $sourceId = (string) ($p['sku'] ?? '');
+            if ($sourceId === '') {
+                continue;
+            }
+
+            $details = $magento->fetchProductWithChildren($conn, $sourceId);
+            $parentProduct = $details['parent'] ?? $p;
+            $children = $details['children'] ?? [];
+            $payload = $mapper->mapParentWithVariants($parentProduct, $children, $locationGid, $shop->id);
+            $fp = $fingerprints->make($payload);
+
+            $childCount = is_array($children) ? count($children) : 0;
+            $expectedVariantCount = $childCount > 0 ? $childCount : 1;
+
+            $childSample = [];
+            if (is_array($children) && count($children) > 0) {
+                foreach (array_slice($children, 0, 10) as $c) {
+                    $childSample[] = [
+                        'id' => $c['id'] ?? null,
+                        'sku' => $c['sku'] ?? null,
+                    ];
+                }
+            }
+
+            $variants = data_get($payload, 'variants', []);
+            $productOptions = data_get($payload, 'productOptions', []);
+            $variantCount = is_array($variants) ? count($variants) : 0;
+            $optionCount = is_array($productOptions) ? count($productOptions) : 0;
+
+            $vendor = (string) data_get($payload, 'vendor', '');
+            $productType = (string) data_get($payload, 'productType', '');
+            $seoTitle = (string) data_get($payload, 'seo.title', '');
+            $seoDescription = (string) data_get($payload, 'seo.description', '');
+            $seoHandle = (string) data_get($payload, 'handle', '');
+            $metafields = [];
+            $hasSeoKeywords = false;
+
+            $mediaCount = 0;
+            $media = $p['media_gallery_entries'] ?? [];
+            if (is_array($media)) {
+                $mediaCount = count($media);
+            }
+            $hasCover = false;
+            foreach ($media as $m) {
+                if (in_array('image', $m['types'] ?? [])) {
+                    $hasCover = true;
+                    break;
+                }
+            }
+
+            $categorySummaries = [];
+            $categories = $p['extension_attributes']['category_links'] ?? [];
+            if (is_array($categories)) {
+                foreach ($categories as $c) {
+                    $cid = (string) data_get($c, 'category_id', '');
+                    if ($cid !== '') {
+                        $categorySummaries[] = [
+                            'id' => $cid,
+                            'name' => 'Category ID ' . $cid,
+                        ];
+                    }
+                }
+            }
+
+            $variantSample = null;
+            if (is_array($variants) && count($variants) > 0 && is_array($variants[0])) {
+                $variantSample = [
+                    'sku' => data_get($variants[0], 'sku'),
+                    'price' => data_get($variants[0], 'price'),
+                    'compare_at' => data_get($variants[0], 'compareAtPrice'),
+                    'qty' => data_get($variants[0], 'inventoryQuantities.0.quantity'),
+                    'weight' => data_get($variants[0], 'weight'),
+                ];
+            }
+
+            $issues = [];
+            if ($variantCount > 100) {
+                $issues[] = 'Variant count exceeds Shopify limit (100). This product needs splitting or pruning.';
+            }
+            if ($optionCount > 3) {
+                $issues[] = 'Option count exceeds Shopify limit (3).';
+            }
+            if ($variantCount === 0) {
+                $issues[] = 'No variants generated (unexpected).';
+            }
+            if ($variantCount !== $expectedVariantCount) {
+                $issues[] = 'Variant audit mismatch: mapped variant count does not match Shopware child count.';
+            }
+
+            $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $payloadBytes = is_string($json) ? strlen($json) : null;
+
+            $out = [
+                'source_id' => $sourceId,
+                'title' => (string) data_get($payload, 'title', ''),
+                'vendor' => $vendor,
+                'product_type' => $productType,
+                'seo_present' => ($seoTitle !== '' || $seoDescription !== ''),
+                'seo_handle' => $seoHandle !== '' ? $seoHandle : null,
+                'seo_keywords_present' => $hasSeoKeywords,
+                'media_count' => $mediaCount,
+                'has_cover' => $hasCover,
+                'categories' => $categorySummaries,
+                'variant_sample' => $variantSample,
+                'shopware_child_count' => $childCount,
+                'expected_variant_count' => $expectedVariantCount,
+                'variant_count' => $variantCount,
+                'option_count' => $optionCount,
+                'fingerprint' => $fp,
+                'payload_bytes' => $payloadBytes,
+                'child_sample' => $childSample,
+                'issues' => $issues,
+            ];
+
+            if ($includePayload) {
+                $out['payload'] = $payload;
+            }
+
+            $items[] = $out;
+        }
+
         return response()->json([
             'page'  => $page,
             'total' => $total,
-            'items' => [],
+            'items' => $items,
         ]);
     }
 
@@ -717,11 +855,11 @@ class MigrationController extends Controller
             }
             $gte = CarbonImmutable::createFromFormat('Y-m-d', $after)
                 ->startOfDay()
-                ->toIso8601String();
+                ->toDateTimeString();
             return [[
-                'type'       => 'range',
-                'field'      => 'createdAt',
-                'parameters' => ['gte' => $gte],
+                'field' => 'created_at',
+                'type'  => 'greater_than_equals',
+                'value' => $gte,
             ]];
         }
 
@@ -734,14 +872,18 @@ class MigrationController extends Controller
             if ($from->greaterThan($to)) {
                 return ['error' => 'The after date must be before or equal to the before date'];
             }
-            return [[
-                'type'       => 'range',
-                'field'      => 'createdAt',
-                'parameters' => [
-                    'gte' => $from->toIso8601String(),
-                    'lte' => $to->toIso8601String(),
+            return [
+                [
+                    'field' => 'created_at',
+                    'type'  => 'greater_than_equals',
+                    'value' => $from->toDateTimeString(),
                 ],
-            ]];
+                [
+                    'field' => 'created_at',
+                    'type'  => 'less_than_equals',
+                    'value' => $to->toDateTimeString(),
+                ]
+            ];
         }
 
         return ['error' => 'Invalid mode'];

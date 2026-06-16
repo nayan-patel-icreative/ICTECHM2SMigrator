@@ -32,7 +32,7 @@ class MigrationRunReportWriterTest extends TestCase
         $writer = new MigrationRunReportWriter();
         $headers = $writer->headersForType('products');
 
-        $this->assertSame('shopware_product_id', $headers[0]);
+        $this->assertSame('magento_product_id', $headers[0]);
         $this->assertContains('variant_count', $headers);
         $this->assertContains('migrated_at_utc', $headers);
     }

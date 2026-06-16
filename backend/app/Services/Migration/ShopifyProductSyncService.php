@@ -125,12 +125,12 @@ GQL;
      */
     private function ensureShopwareIdMetafieldDefinition(Shop $shop): array
     {
-        $cacheKey = 'shopify:product_custom_id_definition_ensured:'.$shop->id;
+        $cacheKey = 'shopify:product_custom_id_definition_ensured_v2:'.$shop->id;
         if (Cache::get($cacheKey)) {
             return ['ok' => true];
         }
 
-        $lock = Cache::lock('shopify:product_custom_id_definition_lock:'.$shop->id, 60);
+        $lock = Cache::lock('shopify:product_custom_id_definition_lock_v2:'.$shop->id, 60);
         return $lock->block(20, function () use ($shop, $cacheKey) {
             if (Cache::get($cacheKey)) {
                 return ['ok' => true];
@@ -145,11 +145,25 @@ mutation CreateDef($definition: MetafieldDefinitionInput!) {
 }
 GQL;
 
+            $deleteMutation = <<<'GQL'
+mutation DeleteDef($id: ID!) {
+  metafieldDefinitionDelete(id: $id, deleteAllAssociatedMetafields: true) {
+    deletedDefinitionId
+    userErrors { field message }
+  }
+}
+GQL;
+
             // 1. Ensure PRODUCT-level custom_id definition (required for ProductSetIdentifiers)
             $query = <<<'GQL'
 query FindDef {
   metafieldDefinitions(first: 1, ownerType: PRODUCT, namespace: "shopware", key: "custom_id") {
-    nodes { id }
+    nodes {
+      id
+      type {
+        name
+      }
+    }
   }
 }
 GQL;
@@ -158,14 +172,36 @@ GQL;
                 return ['errors' => $res['errors']];
             }
 
-            if ((string) data_get($res, 'data.metafieldDefinitions.nodes.0.id', '') === '') {
+            $node = data_get($res, 'data.metafieldDefinitions.nodes.0');
+            $existingId = data_get($node, 'id', '');
+            $existingType = data_get($node, 'type.name', '');
+
+            $needCreate = true;
+
+            if ($existingId !== '') {
+                if ($existingType === 'id') {
+                    $needCreate = false;
+                } else {
+                    // Delete old incorrect definition (e.g. single_line_text_field)
+                    $deleteRes = $this->client->query($shop, $deleteMutation, ['id' => $existingId]);
+                    if (isset($deleteRes['errors'])) {
+                        return ['errors' => $deleteRes['errors']];
+                    }
+                    $deleteUserErrors = data_get($deleteRes, 'data.metafieldDefinitionDelete.userErrors', []);
+                    if (is_array($deleteUserErrors) && count($deleteUserErrors) > 0) {
+                        return ['userErrors' => $deleteUserErrors];
+                    }
+                }
+            }
+
+            if ($needCreate) {
                 $create = $this->client->query($shop, $mutation, [
                     'definition' => [
                         'name' => 'Magento Custom ID',
                         'namespace' => self::CUSTOM_ID_NAMESPACE,
                         'key' => self::CUSTOM_ID_KEY,
                         'ownerType' => 'PRODUCT',
-                        'type' => 'single_line_text_field',
+                        'type' => 'id',
                         'pin' => true,
                     ],
                 ]);
@@ -191,7 +227,7 @@ GQL;
                                 'namespace' => self::CUSTOM_ID_NAMESPACE,
                                 'key' => self::CUSTOM_ID_KEY,
                                 'ownerType' => 'PRODUCT',
-                                'type' => 'single_line_text_field',
+                                'type' => 'id',
                                 'pin' => false,
                             ],
                         ]);

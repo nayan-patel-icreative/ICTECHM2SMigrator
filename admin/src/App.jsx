@@ -2913,66 +2913,107 @@ function App() {
                                       </Button>
                                     </ButtonGroup>
                                     {expandedCustomerPreviewId === it.source_id ? (
-                                      <Box paddingBlockStart="150">
-                                        {it.payload ? (
-                                          <Box paddingBlockStart="150">
-                                            <Text as="p" tone="subdued">
-                                              Shopify payload
-                                            </Text>
-                                            <Box
-                                              padding="200"
-                                              background="bg-surface"
-                                              borderColor="border"
-                                              borderWidth="025"
-                                              borderRadius="200"
-                                              overflowX="scroll"
-                                            >
-                                              <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                                                {JSON.stringify(it.payload, null, 2)}
-                                              </pre>
-                                            </Box>
-                                          </Box>
-                                        ) : null}
+                                      <Box paddingBlockStart="300">
+                                        <Card background="bg-surface-secondary">
+                                          <BlockStack gap="400">
+                                            <BlockStack gap="200">
+                                              <Text as="h4" variant="headingSm">Customer Profile Info</Text>
+                                              <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px 16px', fontSize: '13px' }}>
+                                                <Text as="span" tone="subdued">Magento Customer ID:</Text>
+                                                <Text as="span" fontWeight="medium">{it.source_id}</Text>
+                                                
+                                                <Text as="span" tone="subdued">Full Name:</Text>
+                                                <Text as="span">{it.first_name || '-'} {it.last_name || '-'}</Text>
+                                                
+                                                <Text as="span" tone="subdued">Email:</Text>
+                                                <Text as="span">{it.email || '-'}</Text>
+                                                
+                                                <Text as="span" tone="subdued">Phone:</Text>
+                                                <Text as="span">{it.payload?.phone || it.shopware_raw?.telephone || '-'}</Text>
 
-                                        {it.shopware_metafields ? (
-                                          <Box paddingBlockStart="150">
-                                            <Text as="p" tone="subdued">
-                                              Magento metafields
-                                            </Text>
-                                            <Box
-                                              padding="200"
-                                              background="bg-surface"
-                                              borderColor="border"
-                                              borderWidth="025"
-                                              borderRadius="200"
-                                              overflowX="scroll"
-                                            >
-                                              <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                                                {JSON.stringify(it.shopware_metafields, null, 2)}
-                                              </pre>
-                                            </Box>
-                                          </Box>
-                                        ) : null}
+                                                <Text as="span" tone="subdued">Magento Group ID:</Text>
+                                                <Text as="span">{it.shopware_raw?.group_id || '-'}</Text>
 
-                                        {it.shopware_raw ? (
-                                          <Box paddingBlockStart="150">
-                                            <Text as="p" tone="subdued">
-                                              Magento raw
-                                            </Text>
-                                            <Box
-                                              padding="200"
-                                              background="bg-surface"
-                                              borderColor="border"
-                                              borderWidth="025"
-                                              borderRadius="200"
-                                              overflowX="scroll"
-                                            >
-                                              <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                                                {JSON.stringify(it.shopware_raw, null, 2)}
-                                              </pre>
-                                            </Box>
-                                          </Box>
-                                        ) : null}
+                                                <Text as="span" tone="subdued">Newsletter Subscription:</Text>
+                                                <span style={{ display: 'inline-flex' }}>
+                                                  {it.shopware_raw?.extension_attributes?.is_subscribed ? (
+                                                    <span style={{ backgroundColor: '#e2f9e4', color: '#1f6a27', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                                                      Subscribed (Magento)
+                                                    </span>
+                                                  ) : (
+                                                    <span style={{ backgroundColor: '#f1f2f3', color: '#6d7175', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                                                      Not Subscribed
+                                                    </span>
+                                                  )}
+                                                </span>
+
+                                                <Text as="span" tone="subdued">Shopify Marketing Consent:</Text>
+                                                <span style={{ display: 'inline-flex' }}>
+                                                  {it.payload?.emailMarketingConsent?.marketingState === 'SUBSCRIBED' ? (
+                                                    <span style={{ backgroundColor: '#e2f9e4', color: '#1f6a27', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                                                      SUBSCRIBED (Shopify)
+                                                    </span>
+                                                  ) : (
+                                                    <span style={{ backgroundColor: '#f1f2f3', color: '#6d7175', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                                                      NOT_SUBSCRIBED
+                                                    </span>
+                                                  )}
+                                                </span>
+
+                                                <Text as="span" tone="subdued">Shopify Tags:</Text>
+                                                <Text as="span">{it.payload?.tags || '-'}</Text>
+                                              </div>
+                                            </BlockStack>
+
+                                            <hr style={{ border: '0', borderTop: '1px solid var(--p-color-border-subdued)', margin: '0' }} />
+
+                                            <BlockStack gap="200">
+                                              <Text as="h4" variant="headingSm">Address Book ({it.payload?.addresses?.length || 0})</Text>
+                                              {it.payload?.addresses && it.payload.addresses.length > 0 ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                  {it.payload.addresses.map((addr, idx) => (
+                                                    <div 
+                                                      key={idx} 
+                                                      style={{ 
+                                                        padding: '10px', 
+                                                        border: '1px solid var(--p-color-border-subdued)', 
+                                                        borderRadius: '6px', 
+                                                        background: 'var(--p-color-bg-surface)',
+                                                        fontSize: '13px'
+                                                      }}
+                                                    >
+                                                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                                        <Text as="span" fontWeight="bold">Address #{idx + 1}</Text>
+                                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                                          {addr.default_shipping && <span style={{ backgroundColor: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>Default Shipping</span>}
+                                                          {addr.default_billing && <span style={{ backgroundColor: '#faf5ff', color: '#6b21a8', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>Default Billing</span>}
+                                                        </div>
+                                                      </div>
+                                                      <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: '4px 8px' }}>
+                                                        <span style={{ color: 'var(--p-color-text-subdued)' }}>Recipient:</span>
+                                                        <span>{addr.firstName} {addr.lastName} {addr.company ? `(${addr.company})` : ''}</span>
+
+                                                        <span style={{ color: 'var(--p-color-text-subdued)' }}>Street:</span>
+                                                        <span>{addr.address1} {addr.address2 ? `, ${addr.address2}` : ''}</span>
+
+                                                        <span style={{ color: 'var(--p-color-text-subdued)' }}>City/Region:</span>
+                                                        <span>{addr.city}, {addr.province} {addr.zip}</span>
+
+                                                        <span style={{ color: 'var(--p-color-text-subdued)' }}>Country:</span>
+                                                        <span>{addr.countryCode}</span>
+
+                                                        <span style={{ color: 'var(--p-color-text-subdued)' }}>Phone:</span>
+                                                        <span>{addr.phone || '-'}</span>
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              ) : (
+                                                <Text as="span" tone="subdued">No addresses mapped for this customer.</Text>
+                                              )}
+                                            </BlockStack>
+                                          </BlockStack>
+                                        </Card>
                                       </Box>
                                     ) : null}
                                   </Box>
@@ -3705,42 +3746,53 @@ function App() {
                                       </Button>
                                     </ButtonGroup>
                                     {expandedNewsletterPreviewId === (it.source_id || it.email) ? (
-                                      <Box paddingBlockStart="150">
-                                        {it.payload ? (
-                                          <Box paddingBlockStart="150">
-                                            <Text as="p" tone="subdued">
-                                              Shopify payload
-                                            </Text>
-                                            <Box
-                                              padding="200"
-                                              background="bg-surface"
-                                              borderColor="border"
-                                              borderWidth="025"
-                                              borderRadius="200"
-                                              overflowX="scroll"
-                                            >
-                                              <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{JSON.stringify(it.payload, null, 2)}</pre>
-                                            </Box>
-                                          </Box>
-                                        ) : null}
+                                      <Box paddingBlockStart="300">
+                                        <Card background="bg-surface-secondary">
+                                          <BlockStack gap="300">
+                                            <BlockStack gap="200">
+                                              <Text as="h4" variant="headingSm">Newsletter Subscriber Details</Text>
+                                              <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px 16px', fontSize: '13px' }}>
+                                                <Text as="span" tone="subdued">Subscriber ID:</Text>
+                                                <Text as="span" fontWeight="medium">{it.source_id || it.shopware_raw?.subscriber_id || '-'}</Text>
 
-                                        {it.shopware_raw ? (
-                                          <Box paddingBlockStart="150">
-                                            <Text as="p" tone="subdued">
-                                              Magento raw
-                                            </Text>
-                                            <Box
-                                              padding="200"
-                                              background="bg-surface"
-                                              borderColor="border"
-                                              borderWidth="025"
-                                              borderRadius="200"
-                                              overflowX="scroll"
-                                            >
-                                              <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{JSON.stringify(it.shopware_raw, null, 2)}</pre>
-                                            </Box>
-                                          </Box>
-                                        ) : null}
+                                                <Text as="span" tone="subdued">Customer ID:</Text>
+                                                <Text as="span">{it.shopware_raw?.customer_id || '-'}</Text>
+
+                                                <Text as="span" tone="subdued">Email:</Text>
+                                                <Text as="span">{it.email || '-'}</Text>
+
+                                                <Text as="span" tone="subdued">Subscriber Status:</Text>
+                                                <span style={{ display: 'inline-flex' }}>
+                                                  {it.shopware_raw?.subscriber_status === 1 || it.active ? (
+                                                    <span style={{ backgroundColor: '#e2f9e4', color: '#1f6a27', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                                                      Subscribed
+                                                    </span>
+                                                  ) : (
+                                                    <span style={{ backgroundColor: '#fff0f0', color: '#8c1d18', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                                                      Unsubscribed
+                                                    </span>
+                                                  )}
+                                                </span>
+
+                                                <Text as="span" tone="subdued">Shopify Marketing State:</Text>
+                                                <span style={{ display: 'inline-flex' }}>
+                                                  {it.payload?.emailMarketingConsent?.marketingState === 'SUBSCRIBED' ? (
+                                                    <span style={{ backgroundColor: '#e2f9e4', color: '#1f6a27', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                                                      SUBSCRIBED
+                                                    </span>
+                                                  ) : (
+                                                    <span style={{ backgroundColor: '#f1f2f3', color: '#6d7175', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                                                      NOT_SUBSCRIBED
+                                                    </span>
+                                                  )}
+                                                </span>
+
+                                                <Text as="span" tone="subdued">Store ID / View:</Text>
+                                                <Text as="span">{it.shopware_raw?.store_id || '-'}</Text>
+                                              </div>
+                                            </BlockStack>
+                                          </BlockStack>
+                                        </Card>
                                       </Box>
                                     ) : null}
                                   </Box>

@@ -532,7 +532,10 @@ function App() {
     if (typeof d.files_path === 'string' && d.files_path !== '' && filesPath === '') {
       setFilesPath(d.files_path)
     }
-  }, [connectionQuery.data, apiUrl, filesPath])
+    if (typeof d.shopify_location_gid === 'string' && d.shopify_location_gid !== '' && locationGid === '') {
+      setLocationGid(d.shopify_location_gid)
+    }
+  }, [connectionQuery.data, apiUrl, filesPath, locationGid])
 
   const meQuery = useQuery({
     queryKey: ['me'],
@@ -648,6 +651,24 @@ function App() {
       setToast({ content: e.message || 'Failed to save connection', error: true })
     },
   })
+
+  const saveLocationMutation = useMutation({
+    mutationFn: (locationId) => api.post('/api/shopify/location', { location_gid: locationId }),
+    onSuccess: () => {
+      connectionQuery.refetch()
+      setToast({ content: 'Shopify location saved' })
+    },
+    onError: (e) => {
+      setToast({ content: e.message || 'Failed to save Shopify location', error: true })
+    },
+  })
+
+  const handleLocationChange = useCallback((value) => {
+    setLocationGid(value)
+    if (value) {
+      saveLocationMutation.mutate(value)
+    }
+  }, [saveLocationMutation])
 
   const startManufacturerMigration = useMutation({
     mutationFn: () => api.post('/api/migration/manufacturers/start', {}),
@@ -779,9 +800,11 @@ function App() {
     if (locationGid) return
     if (!Array.isArray(locations)) return
     if (locations.length === 1 && locations[0]?.id) {
-      setLocationGid(locations[0].id)
+      const locId = locations[0].id
+      setLocationGid(locId)
+      saveLocationMutation.mutate(locId)
     }
-  }, [locations, locationGid])
+  }, [locations, locationGid, saveLocationMutation])
 
   const locationOptions = useMemo(() => {
     return [
@@ -1268,7 +1291,7 @@ function App() {
                     <List.Item>Open your Magento Admin panel.</List.Item>
                     <List.Item>Go to System - Extensions - Integrations.</List.Item>
                     <List.Item>Create a new integration and grant appropriate API resource permissions.</List.Item>
-                    <List.Item>Copy the Access Token.</List.Item>
+                    <List.Item>Copy the Secret Access Token.</List.Item>
                     <List.Item>
                       Set the API URL (example): https://your-magento-domain.com
                     </List.Item>
@@ -1550,7 +1573,7 @@ function App() {
                   label="Location"
                   options={locationOptions}
                   value={locationGid}
-                  onChange={setLocationGid}
+                  onChange={handleLocationChange}
                   disabled={locationsQuery.isLoading}
                 />
                 {locationsQuery.isError ? (

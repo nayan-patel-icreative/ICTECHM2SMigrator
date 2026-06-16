@@ -486,6 +486,36 @@ class MagentoClient
     }
 
     /**
+     * Get newsletter subscription status for a specific customer from Magento.
+     * Returns: 'SUBSCRIBED', 'UNSUBSCRIBED', or 'NOT_FOUND'
+     */
+    public function getCustomerNewsletterStatus(MagentoConnection $conn, string $customerId): string
+    {
+        try {
+            $query = $this->buildSearchCriteria(1, 1, [
+                ['field' => 'customer_id', 'value' => $customerId, 'type' => 'equals'],
+            ]);
+
+            $res = $this->request($conn, 'GET', '/V1/newsletter/subscriptions', ['query' => $query]);
+            $items = $res['items'] ?? [];
+
+            if (!is_array($items) || count($items) === 0) {
+                return 'NOT_FOUND';
+            }
+
+            // Magento subscriber_status: 1 = Subscribed, 2 = Not Active, 3 = Unsubscribed, 4 = Unconfirmed
+            $status = (int) ($items[0]['subscriber_status'] ?? 3);
+            return $status === 1 ? 'SUBSCRIBED' : 'UNSUBSCRIBED';
+        } catch (\Throwable $e) {
+            Log::warning('Failed to fetch newsletter status for customer', [
+                'customer_id' => $customerId,
+                'error' => $e->getMessage(),
+            ]);
+            return 'NOT_FOUND';
+        }
+    }
+
+    /**
      * Search manufacturers (retrieve options of the 'manufacturer' attribute).
      */
     public function searchManufacturers(MagentoConnection $conn, int $limit = 50, int $page = 1): array

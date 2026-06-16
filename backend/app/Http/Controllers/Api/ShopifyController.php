@@ -91,4 +91,27 @@ GQL;
             }, $nodes)),
         ]);
     }
+
+    public function saveLocation(Request $request)
+    {
+        /** @var Shop $shop */
+        $shop = $request->attributes->get('shop');
+
+        $validated = $request->validate([
+            'location_gid' => ['required', 'string', 'max:255', 'regex:/^gid:\\/\\/shopify\\/Location\\/[0-9]+$/'],
+        ]);
+
+        $conn = $shop->magentoConnection;
+        if (!$conn) {
+            return response()->json(['message' => 'Magento connection not configured'], 400);
+        }
+
+        $conn->shopify_location_gid = $validated['location_gid'];
+        $conn->save();
+
+        return response()->json([
+            'success' => true,
+            'shopify_location_gid' => $conn->shopify_location_gid,
+        ]);
+    }
 }

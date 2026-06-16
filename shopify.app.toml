@@ -1,8 +1,8 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "41301c0c55625866ed02a62a1e0a8e8c"
+client_id = "d9aa4e299ccb21484413b932e76fc9e5"
 name = "ICTECHM2SMigrator"
-application_url = "https://beam-flash-large-holding.trycloudflare.com"
+application_url = "https://wheat-raised-upgrading-cardiac.trycloudflare.com"
 embedded = true
 
 [build]
@@ -20,5 +20,5 @@ scopes = "read_products,write_products,read_inventory,write_inventory,read_locat
 
 [auth]
 redirect_urls = [
-  "https://beam-flash-large-holding.trycloudflare.com/auth/shopify/callback"
+  "https://wheat-raised-upgrading-cardiac.trycloudflare.com/auth/shopify/callback"
 ]

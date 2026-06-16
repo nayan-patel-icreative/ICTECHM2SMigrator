@@ -14,6 +14,7 @@ class MagentoConnection extends Model
         'store_view_name',
         'language_config',
         'files_path',
+        'shopify_location_gid',
     ];
 
     protected $casts = [

@@ -18,6 +18,7 @@ Route::middleware(['shopify.session_token'])->group(function () {
     Route::middleware(['throttle:api'])->group(function () {
         Route::get('/me', [ShopifyController::class, 'me']);
         Route::get('/shopify/locations', [ShopifyController::class, 'locations']);
+        Route::post('/shopify/location', [ShopifyController::class, 'saveLocation']);
 
         Route::get('/queue/health', [QueueHealthController::class, 'show']);
 

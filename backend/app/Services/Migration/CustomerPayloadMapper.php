@@ -6,7 +6,12 @@ use App\Models\Shop;
 
 class CustomerPayloadMapper
 {
-    public function mapCustomer(array $customer, ?Shop $shop = null): array
+    /**
+     * Map a Magento customer record to Shopify CustomerInput payload.
+     *
+     * @param string $newsletterStatus 'SUBSCRIBED', 'UNSUBSCRIBED', or 'NOT_FOUND'
+     */
+    public function mapCustomer(array $customer, ?Shop $shop = null, string $newsletterStatus = 'NOT_FOUND'): array
     {
         $email = (string) ($customer['email'] ?? '');
         $firstName = (string) ($customer['firstname'] ?? '');
@@ -43,22 +48,39 @@ class CustomerPayloadMapper
         }
 
         $payload = [
-            'email' => $email !== '' ? $email : null,
+            'email'     => $email !== '' ? $email : null,
             'firstName' => $firstName !== '' ? $firstName : null,
-            'lastName' => $lastName !== '' ? $lastName : null,
-            'phone' => $phone,
-            'note' => count($noteParts) > 0 ? implode("\n", $noteParts) : null,
+            'lastName'  => $lastName !== '' ? $lastName : null,
+            'phone'     => $phone,
+            'note'      => count($noteParts) > 0 ? implode("\n", $noteParts) : null,
         ];
+
+        // --- Newsletter / Email Marketing Consent ---
+        if ($newsletterStatus === 'SUBSCRIBED') {
+            $payload['emailMarketingConsent'] = [
+                'marketingState'       => 'SUBSCRIBED',
+                'marketingOptInLevel'  => 'CONFIRMED_OPT_IN',
+                'consentUpdatedAt'     => now()->toIso8601String(),
+            ];
+        } elseif ($newsletterStatus === 'UNSUBSCRIBED') {
+            $payload['emailMarketingConsent'] = [
+                'marketingState'       => 'UNSUBSCRIBED',
+                'marketingOptInLevel'  => 'CONFIRMED_OPT_IN',
+                'consentUpdatedAt'     => now()->toIso8601String(),
+            ];
+        }
 
         $mappedAddresses = $this->mapAddresses($customer);
         if (count($mappedAddresses) > 0) {
             $payload['addresses'] = $mappedAddresses;
         }
 
-        $tags = [];
-        $tags[] = 'Magento';
+        $tags = ['Magento'];
         if (isset($customer['group_id'])) {
             $tags[] = 'magento_group_id:' . $customer['group_id'];
+        }
+        if ($newsletterStatus === 'SUBSCRIBED') {
+            $tags[] = 'newsletter_subscribed';
         }
 
         if (count($tags) > 0) {
@@ -73,7 +95,7 @@ class CustomerPayloadMapper
     /**
      * @return array<int, array{namespace: string, key: string, type: string, value: string}>
      */
-    public function mapShopwareMetafields(array $customer, ?Shop $shop = null): array
+    public function mapShopwareMetafields(array $customer, ?Shop $shop = null, string $newsletterStatus = 'NOT_FOUND'): array
     {
         $out = [];
 
@@ -83,6 +105,7 @@ class CustomerPayloadMapper
         $this->pushMetafield($out, 'created_at', (string) ($customer['created_at'] ?? ''));
         $this->pushMetafield($out, 'updated_at', (string) ($customer['updated_at'] ?? ''));
         $this->pushMetafield($out, 'store_id', (string) ($customer['store_id'] ?? ''));
+        $this->pushMetafield($out, 'newsletter_status', $newsletterStatus);
 
         $raw = json_encode($customer, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         if (is_string($raw) && $raw !== '') {
@@ -91,6 +114,7 @@ class CustomerPayloadMapper
 
         return $out;
     }
+
 
     private function normalizeE164Phone(string $phone): ?string
     {

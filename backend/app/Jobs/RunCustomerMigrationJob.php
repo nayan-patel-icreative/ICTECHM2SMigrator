@@ -141,18 +141,29 @@ class RunCustomerMigrationJob implements ShouldQueue
                 try {
                     $customerLocale = '';
                     $customerLangName = '';
-                    $enabledLanguages = [];
 
-                    $payload = $mapper->mapCustomer($c, $shop);
+                    // --- Fetch newsletter subscription status from Magento ---
+                    $newsletterStatus = 'NOT_FOUND';
+                    try {
+                        $newsletterStatus = $magento->getCustomerNewsletterStatus($conn, $sourceId);
+                    } catch (\Throwable) {
+                        // Non-fatal: proceed without newsletter status
+                    }
+
+                    $payload = $mapper->mapCustomer($c, $shop, $newsletterStatus);
                     if ($customerLocale !== '') {
                         $payload['locale'] = $customerLocale;
                     }
+
+                    // Build fingerprint BEFORE moving emailMarketingConsent to __metafields
+                    // so that changes in newsletter subscription trigger re-migration
                     $fp = $fingerprints->make($payload);
 
-                    $metafields = $mapper->mapShopwareMetafields($c, $shop);
+                    $metafields = $mapper->mapShopwareMetafields($c, $shop, $newsletterStatus);
                     if (is_array($metafields) && count($metafields) > 0) {
                         $payload['__metafields'] = $metafields;
                     }
+
 
                     $previousFp = $this->latestSucceededFingerprint($shop->id, $sourceId);
                     if ($hasExistingShopifyCustomer && is_string($previousFp) && $previousFp !== '' && hash_equals($previousFp, $fp)) {

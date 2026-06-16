@@ -328,7 +328,7 @@ class CustomerMigrationController extends Controller
             }
 
             $from = CarbonImmutable::createFromFormat('Y-m-d', $after)->startOfDay();
-            $to = CarbonImmutable::createFromFormat('Y-m-d', $before)->endOfDay();
+            $to   = CarbonImmutable::createFromFormat('Y-m-d', $before)->endOfDay();
             if ($from->greaterThan($to)) {
                 return ['error' => 'The after date must be before or equal to the before date'];
             }
@@ -350,3 +350,4 @@ class CustomerMigrationController extends Controller
         return ['error' => 'Invalid mode'];
     }
 }
+

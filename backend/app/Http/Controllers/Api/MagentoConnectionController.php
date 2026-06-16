@@ -23,13 +23,14 @@ class MagentoConnectionController extends Controller
         }
 
         return response()->json([
-            'connected'          => true,
-            'api_url'            => $conn->api_url,
-            'files_path'         => $conn->files_path,
-            'access_token_saved' => $conn->access_token ? true : false,
-            'language_config'    => $conn->language_config ?? [],
-            'store_view_code'    => $conn->store_view_code,
-            'store_view_name'    => $conn->store_view_name,
+            'connected'            => true,
+            'api_url'              => $conn->api_url,
+            'files_path'           => $conn->files_path,
+            'access_token_saved'   => $conn->access_token ? true : false,
+            'language_config'      => $conn->language_config ?? [],
+            'store_view_code'      => $conn->store_view_code,
+            'store_view_name'      => $conn->store_view_name,
+            'shopify_location_gid' => $conn->shopify_location_gid,
         ]);
     }
 
@@ -85,16 +86,22 @@ class MagentoConnectionController extends Controller
             $conn->files_path = (is_string($fp) && trim($fp) !== '') ? rtrim(trim($fp), '/') : null;
         }
 
+        // Persist shopify_location_gid
+        if (array_key_exists('shopify_location_gid', $data)) {
+            $conn->shopify_location_gid = $data['shopify_location_gid'];
+        }
+
         $conn->save();
 
         return response()->json([
-            'connected'          => true,
-            'api_url'            => $apiUrl,
-            'files_path'         => $conn->files_path,
-            'access_token_saved' => $conn->access_token ? true : false,
-            'language_config'    => $conn->language_config ?? [],
-            'store_view_code'    => $conn->store_view_code,
-            'store_view_name'    => $conn->store_view_name,
+            'connected'            => true,
+            'api_url'              => $apiUrl,
+            'files_path'           => $conn->files_path,
+            'access_token_saved'   => $conn->access_token ? true : false,
+            'language_config'      => $conn->language_config ?? [],
+            'store_view_code'      => $conn->store_view_code,
+            'store_view_name'      => $conn->store_view_name,
+            'shopify_location_gid' => $conn->shopify_location_gid,
         ], 200);
     }
 

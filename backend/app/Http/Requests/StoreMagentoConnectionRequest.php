@@ -22,12 +22,13 @@ class StoreMagentoConnectionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'api_url'         => ['required', 'url', 'max:255'],
-            'access_token'    => ['nullable', 'string', 'max:1024'],
-            'store_view_code' => ['nullable', 'string', 'max:64'],
-            'store_view_name' => ['nullable', 'string', 'max:255'],
-            'language_config' => ['nullable', 'array'],
-            'files_path'      => ['nullable', 'string', 'max:1024'],
+            'api_url'              => ['required', 'url', 'max:255'],
+            'access_token'         => ['nullable', 'string', 'max:1024'],
+            'store_view_code'      => ['nullable', 'string', 'max:64'],
+            'store_view_name'      => ['nullable', 'string', 'max:255'],
+            'language_config'      => ['nullable', 'array'],
+            'files_path'           => ['nullable', 'string', 'max:1024'],
+            'shopify_location_gid' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

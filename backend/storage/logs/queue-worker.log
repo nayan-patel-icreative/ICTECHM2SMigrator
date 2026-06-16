@@ -1,12 +1,8 @@
-  2026-06-15 04:47:23 App\Jobs\QueueProbeJob ......................... RUNNING
-  2026-06-15 04:47:23 App\Jobs\QueueProbeJob .................... 49.33ms DONE
-  2026-06-15 04:57:48 App\Jobs\QueueProbeJob ......................... RUNNING
-  2026-06-15 04:57:48 App\Jobs\QueueProbeJob .................... 22.00ms DONE
-  2026-06-15 05:11:55 App\Jobs\QueueProbeJob ......................... RUNNING
-  2026-06-15 05:11:55 App\Jobs\QueueProbeJob .................... 24.67ms DONE
-  2026-06-15 05:13:52 App\Jobs\QueueProbeJob ......................... RUNNING
-  2026-06-15 05:13:52 App\Jobs\QueueProbeJob .................... 24.45ms DONE
-  2026-06-15 05:15:19 App\Jobs\QueueProbeJob ......................... RUNNING
-  2026-06-15 05:15:19 App\Jobs\QueueProbeJob .................... 34.36ms DONE
-  2026-06-15 05:15:40 App\Jobs\QueueProbeJob ......................... RUNNING
-  2026-06-15 05:15:40 App\Jobs\QueueProbeJob .................... 22.58ms DONE
+  2026-06-16 10:39:56 App\Jobs\QueueProbeJob ......................... RUNNING
+  2026-06-16 10:39:56 App\Jobs\QueueProbeJob .................... 30.73ms DONE
+  2026-06-16 10:41:02 App\Jobs\QueueProbeJob ......................... RUNNING
+  2026-06-16 10:41:02 App\Jobs\QueueProbeJob .................... 29.33ms DONE
+  2026-06-16 10:41:36 App\Jobs\QueueProbeJob ......................... RUNNING
+  2026-06-16 10:41:36 App\Jobs\QueueProbeJob .................... 24.91ms DONE
+  2026-06-16 10:41:57 App\Jobs\QueueProbeJob ......................... RUNNING
+  2026-06-16 10:41:57 App\Jobs\QueueProbeJob .................... 25.95ms DONE

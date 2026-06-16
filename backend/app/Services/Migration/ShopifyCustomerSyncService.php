@@ -39,24 +39,36 @@ class ShopifyCustomerSyncService
             }
         }
 
+        // Extract special fields that cannot be set via CustomerInput directly
         $metafields = [];
         if (isset($customerPayload['__metafields']) && is_array($customerPayload['__metafields'])) {
             $metafields = $customerPayload['__metafields'];
         }
 
+        $emailMarketingConsent = null;
+        if (isset($customerPayload['emailMarketingConsent']) && is_array($customerPayload['emailMarketingConsent'])) {
+            $emailMarketingConsent = $customerPayload['emailMarketingConsent'];
+        }
+
         $inputPayload = $customerPayload;
-        unset($inputPayload['__metafields']);
+        unset($inputPayload['__metafields'], $inputPayload['emailMarketingConsent']);
 
         if ($mapping && is_string($mapping->shopify_gid) && $mapping->shopify_gid !== '') {
             $res = $this->updateCustomer($shop, $mapping->shopify_gid, $inputPayload);
             if (!empty($res['customerGid'])) {
+                $customerGid = (string) $res['customerGid'];
+
+                if ($emailMarketingConsent) {
+                    $this->updateEmailMarketingConsent($shop, $customerGid, $emailMarketingConsent);
+                }
+
                 if (is_array($metafields) && count($metafields) > 0) {
-                    $mf = $this->setCustomerMetafields($shop, (string) $res['customerGid'], $metafields);
+                    $mf = $this->setCustomerMetafields($shop, $customerGid, $metafields);
                     if (!empty($mf['errors']) || !empty($mf['userErrors'])) {
-                        return $mf + ['action' => 'updated_metafields_failed', 'customerGid' => (string) $res['customerGid']];
+                        return $mf + ['action' => 'updated_metafields_failed', 'customerGid' => $customerGid];
                     }
                 }
-                return ['customerGid' => $res['customerGid'], 'action' => 'updated'];
+                return ['customerGid' => $customerGid, 'action' => 'updated'];
             }
 
             return $res + ['action' => 'update_failed'];
@@ -64,22 +76,28 @@ class ShopifyCustomerSyncService
 
         $res = $this->createCustomer($shop, $inputPayload);
         if (!empty($res['customerGid']) && is_string($res['customerGid'])) {
+            $customerGid = (string) $res['customerGid'];
+
             ShopifyIdMapping::query()->updateOrCreate([
-                'shop_id' => $shop->id,
+                'shop_id'     => $shop->id,
                 'entity_type' => 'customer',
-                'source_id' => $sourceId,
+                'source_id'   => $sourceId,
             ], [
-                'shopify_gid' => $res['customerGid'],
+                'shopify_gid' => $customerGid,
             ]);
 
+            if ($emailMarketingConsent) {
+                $this->updateEmailMarketingConsent($shop, $customerGid, $emailMarketingConsent);
+            }
+
             if (is_array($metafields) && count($metafields) > 0) {
-                $mf = $this->setCustomerMetafields($shop, (string) $res['customerGid'], $metafields);
+                $mf = $this->setCustomerMetafields($shop, $customerGid, $metafields);
                 if (!empty($mf['errors']) || !empty($mf['userErrors'])) {
-                    return $mf + ['action' => 'created_metafields_failed', 'customerGid' => (string) $res['customerGid']];
+                    return $mf + ['action' => 'created_metafields_failed', 'customerGid' => $customerGid];
                 }
             }
 
-            return ['customerGid' => $res['customerGid'], 'action' => 'created'];
+            return ['customerGid' => $customerGid, 'action' => 'created'];
         }
 
         return $res + ['action' => 'create_failed'];
@@ -152,7 +170,58 @@ GQL;
         return ['userErrors' => [['message' => 'Shopify customerUpdate did not return a customer id']]];
     }
 
+    /**
+     * @param array{marketingState?: string, marketingOptInLevel?: string, consentUpdatedAt?: string} $consent
+     * @return array{ok?: bool, userErrors?: array<int, mixed>, errors?: mixed}
+     */
+    private function updateEmailMarketingConsent(Shop $shop, string $customerGid, array $consent): array
+    {
+        $state = strtoupper(trim((string) ($consent['marketingState'] ?? '')));
+        $optIn = strtoupper(trim((string) ($consent['marketingOptInLevel'] ?? 'CONFIRMED_OPT_IN')));
+        $updatedAt = trim((string) ($consent['consentUpdatedAt'] ?? ''));
+
+        if ($state === '') {
+            return ['ok' => true];
+        }
+
+        $mutation = <<<'GQL'
+mutation UpdateEmailMarketingConsent($input: CustomerEmailMarketingConsentUpdateInput!) {
+  customerEmailMarketingConsentUpdate(input: $input) {
+    customer { id }
+    userErrors { field message }
+  }
+}
+GQL;
+
+        $emailMarketingConsent = [
+            'marketingState'      => $state,
+            'marketingOptInLevel' => $optIn,
+        ];
+        if ($updatedAt !== '') {
+            $emailMarketingConsent['consentUpdatedAt'] = $updatedAt;
+        }
+
+        $res = $this->client->query($shop, $mutation, [
+            'input' => [
+                'customerId'           => $customerGid,
+                'emailMarketingConsent' => $emailMarketingConsent,
+            ],
+        ]);
+
+        if (isset($res['errors'])) {
+            return ['errors' => $res['errors']];
+        }
+
+        $userErrors = data_get($res, 'data.customerEmailMarketingConsentUpdate.userErrors', []);
+        if (is_array($userErrors) && count($userErrors) > 0) {
+            return ['userErrors' => $userErrors];
+        }
+
+        return ['ok' => true];
+    }
+
     private function shopifyCustomerExists(Shop $shop, string $customerGid): bool
+
     {
         try {
             $q = <<<'GQL'

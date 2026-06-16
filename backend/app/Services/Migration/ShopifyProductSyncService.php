@@ -176,6 +176,33 @@ GQL;
 
                 $userErrors = data_get($create, 'data.metafieldDefinitionCreate.userErrors', []);
                 if (is_array($userErrors) && count($userErrors) > 0) {
+                    $hasPinLimitError = false;
+                    foreach ($userErrors as $ue) {
+                        if (str_contains(strtolower((string) data_get($ue, 'message', '')), 'limit of 50 pinned definitions')) {
+                            $hasPinLimitError = true;
+                            break;
+                        }
+                    }
+
+                    if ($hasPinLimitError) {
+                        $create = $this->client->query($shop, $mutation, [
+                            'definition' => [
+                                'name' => 'Magento Custom ID',
+                                'namespace' => self::CUSTOM_ID_NAMESPACE,
+                                'key' => self::CUSTOM_ID_KEY,
+                                'ownerType' => 'PRODUCT',
+                                'type' => 'single_line_text_field',
+                                'pin' => false,
+                            ],
+                        ]);
+                        if (isset($create['errors'])) {
+                            return ['errors' => $create['errors']];
+                        }
+                        $userErrors = data_get($create, 'data.metafieldDefinitionCreate.userErrors', []);
+                    }
+                }
+
+                if (is_array($userErrors) && count($userErrors) > 0) {
                     $nonFatal = array_filter($userErrors, function ($e) {
                         $msg = strtolower((string) data_get($e, 'message', ''));
                         return str_contains($msg, 'key is in use') || str_contains($msg, 'already exists');
@@ -326,6 +353,27 @@ GQL;
                 }
 
                 $userErrors = data_get($create, 'data.metafieldDefinitionCreate.userErrors', []);
+                if (is_array($userErrors) && count($userErrors) > 0) {
+                    $hasPinLimitError = false;
+                    foreach ($userErrors as $ue) {
+                        if (str_contains(strtolower((string) data_get($ue, 'message', '')), 'limit of 50 pinned definitions')) {
+                            $hasPinLimitError = true;
+                            break;
+                        }
+                    }
+
+                    if ($hasPinLimitError) {
+                        $definition['pin'] = false;
+                        $create = $this->client->query($shop, $mutation, [
+                            'definition' => $definition,
+                        ]);
+                        if (isset($create['errors'])) {
+                            return ['errors' => $create['errors']];
+                        }
+                        $userErrors = data_get($create, 'data.metafieldDefinitionCreate.userErrors', []);
+                    }
+                }
+
                 if (is_array($userErrors) && count($userErrors) > 0) {
                     $nonFatal = array_filter($userErrors, function ($e) {
                         $msg = strtolower((string) data_get($e, 'message', ''));
@@ -536,6 +584,25 @@ GQL;
         }
 
         $userErrors = data_get($create, 'data.metafieldDefinitionCreate.userErrors', []);
+        if (is_array($userErrors) && count($userErrors) > 0) {
+            $hasPinLimitError = false;
+            foreach ($userErrors as $ue) {
+                if (str_contains(strtolower((string) data_get($ue, 'message', '')), 'limit of 50 pinned definitions')) {
+                    $hasPinLimitError = true;
+                    break;
+                }
+            }
+
+            if ($hasPinLimitError) {
+                $definition['pin'] = false;
+                $create = $this->client->query($shop, $mutation, ['definition' => $definition]);
+                if (isset($create['errors'])) {
+                    return ['errors' => $create['errors']];
+                }
+                $userErrors = data_get($create, 'data.metafieldDefinitionCreate.userErrors', []);
+            }
+        }
+
         if (is_array($userErrors) && count($userErrors) > 0) {
             $allNonFatal = array_filter($userErrors, function ($e) {
                 $msg = strtolower((string) data_get($e, 'message', ''));

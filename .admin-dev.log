@@ -2,8 +2,10 @@
 > admin@0.0.0 dev
 > vite --host 0.0.0.0
 
-
-  VITE v8.0.10  ready in 831 ms
-
-  ➜  Local:   http://localhost:5174/admin/
-  ➜  Network: http://192.168.1.104:5174/admin/
+error when starting dev server:
+Error: Port 5174 is already in use
+    at httpServerStart (file:///var/www/html/ICTECHM2SMigrator/admin/node_modules/vite/dist/node/chunks/node.js:10662:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async startServer (file:///var/www/html/ICTECHM2SMigrator/admin/node_modules/vite/dist/node/chunks/node.js:26333:30)
+    at async Object.listen (file:///var/www/html/ICTECHM2SMigrator/admin/node_modules/vite/dist/node/chunks/node.js:26152:4)
+    at async CAC.<anonymous> (file:///var/www/html/ICTECHM2SMigrator/admin/node_modules/vite/dist/node/cli.js:722:3)

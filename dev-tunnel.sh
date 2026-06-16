@@ -21,3 +21,4 @@ echo "Tunnel logs (look for https://*.trycloudflare.com):"
 echo "--------------------------------------------------"
 
 cloudflared tunnel --no-autoupdate --url "http://localhost:$TUNNEL_PORT"
+

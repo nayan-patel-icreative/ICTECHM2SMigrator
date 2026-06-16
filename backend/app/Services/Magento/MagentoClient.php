@@ -343,6 +343,25 @@ class MagentoClient
                 }
                 $children = $this->request($conn, 'GET', $childEndpoint) ?: [];
 
+                // Fetch stock items for each child variant to ensure they are migrated with correct quantities
+                foreach ($children as &$child) {
+                    $childSku = $child['sku'] ?? '';
+                    if ($childSku) {
+                        try {
+                            $stockItem = $this->request($conn, 'GET', '/V1/stockItems/' . urlencode($childSku));
+                            if ($stockItem) {
+                                if (!isset($child['extension_attributes'])) {
+                                    $child['extension_attributes'] = [];
+                                }
+                                $child['extension_attributes']['stock_item'] = $stockItem;
+                            }
+                        } catch (\Throwable $e) {
+                            Log::warning("Could not fetch stock item for child sku: " . $childSku, ['error' => $e->getMessage()]);
+                        }
+                    }
+                }
+                unset($child);
+
                 // Fetch options definitions to know configurable attributes (e.g. Size, Color)
                 $optionsEndpoint = '/V1/configurable-products/' . urlencode($sourceSku) . '/options/all';
                 if ($conn->store_view_code) {

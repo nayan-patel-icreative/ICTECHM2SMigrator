@@ -47,19 +47,25 @@ class OrderPayloadMapper
         $status = strtolower((string) ($order['status'] ?? 'pending'));
         $state = strtolower((string) ($order['state'] ?? 'new'));
 
-        $financialStatus = 'PENDING';
-        $fulfillmentStatus = 'UNFULFILLED';
-
-        if ($status === 'complete') {
-            $financialStatus = 'PAID';
-            $fulfillmentStatus = 'FULFILLED';
-        } elseif ($status === 'processing') {
-            $financialStatus = 'PAID';
+        try {
+            $stateMapper = app(\App\Services\Migration\StateAssignmentMapper::class);
+            $financialStatus = $stateMapper->resolveFinancialStatus($shop, $order);
+            $fulfillmentStatus = $stateMapper->resolveFulfillmentStatus($shop, $order) ?: 'UNFULFILLED';
+        } catch (\Throwable) {
+            $financialStatus = 'PENDING';
             $fulfillmentStatus = 'UNFULFILLED';
-        } elseif ($status === 'closed') {
-            $financialStatus = 'REFUNDED';
-        } elseif ($status === 'canceled') {
-            $financialStatus = 'VOIDED';
+
+            if ($status === 'complete') {
+                $financialStatus = 'PAID';
+                $fulfillmentStatus = 'FULFILLED';
+            } elseif ($status === 'processing') {
+                $financialStatus = 'PAID';
+                $fulfillmentStatus = 'UNFULFILLED';
+            } elseif ($status === 'closed') {
+                $financialStatus = 'REFUNDED';
+            } elseif ($status === 'canceled') {
+                $financialStatus = 'VOIDED';
+            }
         }
 
         $paymentMethod = (string) ($order['payment']['method'] ?? '');

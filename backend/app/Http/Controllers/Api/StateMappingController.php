@@ -18,41 +18,37 @@ class StateMappingController extends Controller
     {
         return [
             'order_state' => [
-                'open'                    => 'open',
-                'in_progress'             => 'open',
-                'completed'               => 'open',
-                'cancelled'               => 'cancelled',
+                'pending'                 => 'open',
+                'pending_payment'         => 'open',
+                'processing'              => 'open',
+                'complete'                => 'open',
+                'closed'                  => 'open',
+                'canceled'                => 'cancelled',
+                'holded'                  => 'open',
+                'payment_review'          => 'open',
+                'fraud'                   => 'open',
             ],
             'transaction_state' => [
-                'open'                    => 'pending',
-                'in_progress'             => 'pending',
-                'paid'                    => 'paid',
-                'paid_partially'          => 'partially_paid',
-                'refunded'                => 'refunded',
-                'partially_refunded'      => 'partially_refunded',
-                'cancelled'               => 'voided',
-                'failed'                  => 'voided',
-                'authorized'              => 'paid',
-                'chargeback'              => 'voided',
-                'unconfirmed'             => 'pending',
-                'reminded'                => 'pending',
+                'pending'                 => 'pending',
+                'pending_payment'         => 'pending',
+                'processing'              => 'paid',
+                'complete'                => 'paid',
+                'closed'                  => 'refunded',
+                'canceled'                => 'voided',
+                'holded'                  => 'pending',
+                'payment_review'          => 'pending',
+                'fraud'                   => 'pending',
             ],
             'delivery_state' => [
-                'open'                    => 'unfulfilled',
-                'shipped'                 => 'fulfilled',
-                'delivered'               => 'fulfilled',
-                'partially_shipped'       => 'partial',
-                'returned'                => 'restocked',
-                'cancelled'               => 'unfulfilled',
-                'returned_partially'      => 'restocked',
-            ],
-            'salutations' => [
-                'mr'                      => 'mr',
-                'mrs'                     => 'mrs',
-                'ms'                      => 'ms',
-                'miss'                    => 'miss',
-                'dr'                      => 'dr',
-                'not_specified'           => '',
+                'pending'                 => 'unfulfilled',
+                'pending_payment'         => 'unfulfilled',
+                'processing'              => 'unfulfilled',
+                'complete'                => 'fulfilled',
+                'closed'                  => 'fulfilled',
+                'canceled'                => 'unfulfilled',
+                'holded'                  => 'unfulfilled',
+                'payment_review'          => 'unfulfilled',
+                'fraud'                   => 'unfulfilled',
             ],
             'payment_methods' => [],
             'shipping_methods' => [],
@@ -76,14 +72,84 @@ class StateMappingController extends Controller
             $result[$row->state_type][$row->shopware_state] = $row->shopify_status;
         }
 
-        // Auto-populate payment_methods and shipping_methods from Magento if connected
+        // Auto-populate order_state, transaction_state, delivery_state, payment_methods, and shipping_methods dynamically from Magento if connected
         $conn = $shop->magentoConnection;
         if ($conn) {
             $magento = app(MagentoClient::class);
 
+            // Fetch dynamic order statuses by reading from recent orders
+            try {
+                // Fetch recent 200 orders to find all unique order statuses in use
+                $ordersRes = $magento->searchOrders($conn, 200, 1);
+                $orders = $ordersRes['orders'] ?? [];
+                
+                foreach ($orders as $order) {
+                    $status = isset($order['status']) ? strtolower(trim((string) $order['status'])) : '';
+                    if ($status === '') {
+                        continue;
+                    }
+
+                    // Auto-register order_state status
+                    if (!isset($result['order_state'][$status])) {
+                        $shopifyStatus = 'open';
+                        if ($status === 'canceled') {
+                            $shopifyStatus = 'cancelled';
+                        }
+                        StateMapping::query()->firstOrCreate(
+                            ['shop_id' => $shop->id, 'state_type' => 'order_state', 'shopware_state' => $status],
+                            ['shopify_status' => $shopifyStatus]
+                        );
+                        $result['order_state'][$status] = $shopifyStatus;
+                    }
+
+                    // Auto-register transaction_state status
+                    if (!isset($result['transaction_state'][$status])) {
+                        $shopifyStatus = 'pending';
+                        if ($status === 'complete' || $status === 'processing') {
+                            $shopifyStatus = 'paid';
+                        } elseif ($status === 'closed') {
+                            $shopifyStatus = 'refunded';
+                        } elseif ($status === 'canceled') {
+                            $shopifyStatus = 'voided';
+                        }
+                        StateMapping::query()->firstOrCreate(
+                            ['shop_id' => $shop->id, 'state_type' => 'transaction_state', 'shopware_state' => $status],
+                            ['shopify_status' => $shopifyStatus]
+                        );
+                        $result['transaction_state'][$status] = $shopifyStatus;
+                    }
+
+                    // Auto-register delivery_state status
+                    if (!isset($result['delivery_state'][$status])) {
+                        $shopifyStatus = 'unfulfilled';
+                        if ($status === 'complete') {
+                            $shopifyStatus = 'fulfilled';
+                        }
+                        StateMapping::query()->firstOrCreate(
+                            ['shop_id' => $shop->id, 'state_type' => 'delivery_state', 'shopware_state' => $status],
+                            ['shopify_status' => $shopifyStatus]
+                        );
+                        $result['delivery_state'][$status] = $shopifyStatus;
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed to fetch dynamic Magento order statuses', ['error' => $e->getMessage()]);
+            }
+
             // Payment methods
             try {
                 $methods = ['checkmo', 'purchaseorder', 'banktransfer', 'cashondelivery', 'paypal_express', 'stripe'];
+                
+                // Scan recent orders for any other payment methods
+                if (isset($orders)) {
+                    foreach ($orders as $order) {
+                        $pm = isset($order['payment']['method']) ? trim((string) $order['payment']['method']) : '';
+                        if ($pm !== '' && !in_array($pm, $methods)) {
+                            $methods[] = $pm;
+                        }
+                    }
+                }
+
                 foreach ($methods as $key) {
                     if (!isset($result['payment_methods'][$key])) {
                         StateMapping::query()->firstOrCreate(
@@ -99,6 +165,17 @@ class StateMappingController extends Controller
             // Shipping methods
             try {
                 $methods = ['flatrate', 'tablerate', 'freeshipping', 'ups', 'usps', 'fedex', 'dhl'];
+
+                // Scan recent orders for any other shipping methods
+                if (isset($orders)) {
+                    foreach ($orders as $order) {
+                        $sm = isset($order['shipping_description']) ? trim((string) $order['shipping_description']) : '';
+                        if ($sm !== '' && !in_array($sm, $methods)) {
+                            $methods[] = $sm;
+                        }
+                    }
+                }
+
                 foreach ($methods as $key) {
                     if (!isset($result['shipping_methods'][$key])) {
                         StateMapping::query()->firstOrCreate(
@@ -129,13 +206,12 @@ class StateMappingController extends Controller
             'mappings.order_state' => ['nullable', 'array'],
             'mappings.transaction_state' => ['nullable', 'array'],
             'mappings.delivery_state' => ['nullable', 'array'],
-            'mappings.salutations' => ['nullable', 'array'],
             'mappings.payment_methods' => ['nullable', 'array'],
             'mappings.shipping_methods' => ['nullable', 'array'],
         ]);
 
         $mappings = $validated['mappings'];
-        $validTypes = ['order_state', 'transaction_state', 'delivery_state', 'salutations', 'payment_methods', 'shipping_methods'];
+        $validTypes = ['order_state', 'transaction_state', 'delivery_state', 'payment_methods', 'shipping_methods'];
         $validOrderStatuses = array_column(self::shopifyOptions()['order_financial'], 'value');
         $validFulfillmentStatuses = array_column(self::shopifyOptions()['fulfillment'], 'value');
 
@@ -183,16 +259,6 @@ class StateMappingController extends Controller
                 ['value' => 'partial',     'label' => 'Partial'],
                 ['value' => 'restocked',   'label' => 'Restocked'],
             ],
-            'salutations' => [
-                ['value' => '',      'label' => '— Not mapped —'],
-                ['value' => 'mr',    'label' => 'Mr'],
-                ['value' => 'mrs',   'label' => 'Mrs'],
-                ['value' => 'ms',    'label' => 'Ms'],
-                ['value' => 'miss',  'label' => 'Miss'],
-                ['value' => 'dr',    'label' => 'Dr'],
-                ['value' => 'prof',  'label' => 'Prof'],
-                ['value' => 'mx',    'label' => 'Mx'],
-            ],
             'payment_methods' => [
                 ['value' => '',                  'label' => '— Not mapped —'],
                 ['value' => 'cash',              'label' => 'Cash'],
@@ -226,7 +292,7 @@ class StateMappingController extends Controller
      * Load saved mappings for a shop, merged with defaults.
      * Used by OrderPayloadMapper.
      *
-     * @return array{order_state: array<string,string>, transaction_state: array<string,string>, delivery_state: array<string,string>, salutations: array<string,string>}
+     * @return array{order_state: array<string,string>, transaction_state: array<string,string>, delivery_state: array<string,string>}
      */
     public static function loadForShop(Shop $shop): array
     {

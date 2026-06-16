@@ -99,15 +99,33 @@ class StateAssignmentMapper
      */
     public function resolveFinancialStatus(Shop $shop, array $order): string
     {
+        $status = '';
+        if (isset($order['status']) && is_string($order['status']) && trim($order['status']) !== '') {
+            $status = strtolower(trim($order['status']));
+        }
+
+        $txState = $status;
+        if ($txState === '') {
+            $tx = data_get($order, 'transactions', []);
+            if (is_array($tx) && isset($tx[0]) && is_array($tx[0])) {
+                $txState = ShopwareStateResolver::technicalName($tx[0]);
+            }
+        }
+
+        $orderStateVal = $status;
+        if ($orderStateVal === '') {
+            $orderStateVal = ShopwareStateResolver::technicalName($order);
+        }
+
         $fromTransaction = $this->financialStatusFromStateType(
             $shop,
             'transaction_state',
-            $this->firstTransactionState($order)
+            $txState
         );
         $fromOrder = $this->financialStatusFromStateType(
             $shop,
             'order_state',
-            $this->orderState($order)
+            $orderStateVal
         );
 
         if ($fromTransaction !== null && $fromTransaction !== '' && $fromTransaction !== 'PENDING') {
@@ -145,20 +163,37 @@ class StateAssignmentMapper
      */
     public function resolveFulfillmentStatus(Shop $shop, array $order): ?string
     {
+        $status = '';
+        if (isset($order['status']) && is_string($order['status']) && trim($order['status']) !== '') {
+            $status = strtolower(trim($order['status']));
+        }
+
+        $dlState = $status;
+        if ($dlState === '') {
+            $deliveries = data_get($order, 'deliveries', []);
+            if (is_array($deliveries) && isset($deliveries[0]) && is_array($deliveries[0])) {
+                $dlState = ShopwareStateResolver::technicalName($deliveries[0]);
+            }
+        }
+
+        $orderStateVal = $status;
+        if ($orderStateVal === '') {
+            $orderStateVal = ShopwareStateResolver::technicalName($order);
+        }
+
         $fromDelivery = $this->fulfillmentFromStateType(
             $shop,
             'delivery_state',
-            $this->firstDeliveryState($order)
+            $dlState
         );
         if ($fromDelivery !== null && $fromDelivery !== '') {
             return $fromDelivery;
         }
 
-        // Shopware order search often returns no deliveries[] — use order state as delivery proxy (e.g. open → fulfilled).
         $fromOrderState = $this->fulfillmentFromStateType(
             $shop,
             'delivery_state',
-            $this->orderState($order)
+            $orderStateVal
         );
         if ($fromOrderState !== null && $fromOrderState !== '') {
             return $fromOrderState;
@@ -184,31 +219,55 @@ class StateAssignmentMapper
 
     private function firstTransactionState(array $order): string
     {
-        $tx = data_get($order, 'transactions', []);
-        if (!is_array($tx) || !isset($tx[0]) || !is_array($tx[0])) {
-            return '';
+        $status = isset($order['status']) && is_string($order['status']) ? strtolower(trim($order['status'])) : '';
+        if ($status !== '') {
+            return $status;
         }
-
-        return ShopwareStateResolver::technicalName($tx[0]);
+        $tx = data_get($order, 'transactions', []);
+        if (is_array($tx) && isset($tx[0]) && is_array($tx[0])) {
+            return ShopwareStateResolver::technicalName($tx[0]);
+        }
+        return '';
     }
 
     private function firstDeliveryState(array $order): string
     {
-        $deliveries = data_get($order, 'deliveries', []);
-        if (!is_array($deliveries) || !isset($deliveries[0]) || !is_array($deliveries[0])) {
-            return '';
+        $status = isset($order['status']) && is_string($order['status']) ? strtolower(trim($order['status'])) : '';
+        if ($status !== '') {
+            return $status;
         }
-
-        return ShopwareStateResolver::technicalName($deliveries[0]);
+        $deliveries = data_get($order, 'deliveries', []);
+        if (is_array($deliveries) && isset($deliveries[0]) && is_array($deliveries[0])) {
+            return ShopwareStateResolver::technicalName($deliveries[0]);
+        }
+        return '';
     }
 
     private function orderState(array $order): string
     {
+        $status = isset($order['status']) && is_string($order['status']) ? strtolower(trim($order['status'])) : '';
+        if ($status !== '') {
+            return $status;
+        }
         return ShopwareStateResolver::technicalName($order);
     }
 
     private function financialStatusFallbackFromRawStates(array $order): string
     {
+        $status = isset($order['status']) && is_string($order['status']) ? strtolower(trim($order['status'])) : '';
+        if ($status !== '') {
+            if ($status === 'complete' || $status === 'processing') {
+                return 'PAID';
+            }
+            if ($status === 'closed') {
+                return 'REFUNDED';
+            }
+            if ($status === 'canceled') {
+                return 'VOIDED';
+            }
+            return 'PENDING';
+        }
+
         $tx = data_get($order, 'transactions', []);
         if (!is_array($tx)) {
             return 'PENDING';
@@ -236,6 +295,14 @@ class StateAssignmentMapper
 
     private function fulfillmentFallbackFromRawStates(array $order): ?string
     {
+        $status = isset($order['status']) && is_string($order['status']) ? strtolower(trim($order['status'])) : '';
+        if ($status !== '') {
+            if ($status === 'complete') {
+                return 'FULFILLED';
+            }
+            return null;
+        }
+
         $deliveries = data_get($order, 'deliveries', []);
         if (!is_array($deliveries)) {
             return null;

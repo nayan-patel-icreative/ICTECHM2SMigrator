@@ -1656,7 +1656,6 @@ function App() {
                         'Order States',
                         'Payment Methods',
                         'Shipping Methods',
-                        'Salutations',
                       ].map((label, idx) => (
                         <button
                           key={idx}
@@ -1828,36 +1827,7 @@ function App() {
                       </BlockStack>
                     )}
 
-                    {stateMappingTab === 5 && (
-                      <BlockStack gap="0">
-                        {Object.entries(stateMappings.salutations || {}).length === 0 ? (
-                          <Box padding="400">
-                            <Text as="p" tone="subdued">No salutations configured. Add salutation mappings via the Magento API or contact support.</Text>
-                          </Box>
-                        ) : (
-                          Object.entries(stateMappings.salutations || {}).map(([swSalutation, sfSalutation], idx) => (
-                            <div key={swSalutation} className="mapping-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--p-color-border-subdued)', background: idx % 2 === 0 ? 'transparent' : 'var(--p-color-bg-surface-secondary)' }}>
-                              <div>
-                                <Text as="span" variant="bodyMd" fontWeight="medium">
-                                  {swSalutation.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                                </Text>
-                                {'  '}
-                                <Text as="span" variant="bodySm" tone="subdued">({swSalutation})</Text>
-                              </div>
-                              <Select
-                                label="" labelHidden
-                                options={(stateMappingOptions.salutations || []).map(o => ({ label: o.label, value: o.value }))}
-                                value={sfSalutation}
-                                onChange={(val) => {
-                                  setStateMappings(prev => ({ ...prev, salutations: { ...prev.salutations, [swSalutation]: val } }))
-                                  setStateMappingDirty(true)
-                                }}
-                              />
-                            </div>
-                          ))
-                        )}
-                      </BlockStack>
-                    )}
+
 
                     <Divider />
 

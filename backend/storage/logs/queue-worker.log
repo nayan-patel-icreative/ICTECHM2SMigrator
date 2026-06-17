@@ -1,8 +1,76 @@
-  2026-06-16 10:39:56 App\Jobs\QueueProbeJob ......................... RUNNING
-  2026-06-16 10:39:56 App\Jobs\QueueProbeJob .................... 30.73ms DONE
-  2026-06-16 10:41:02 App\Jobs\QueueProbeJob ......................... RUNNING
-  2026-06-16 10:41:02 App\Jobs\QueueProbeJob .................... 29.33ms DONE
-  2026-06-16 10:41:36 App\Jobs\QueueProbeJob ......................... RUNNING
-  2026-06-16 10:41:36 App\Jobs\QueueProbeJob .................... 24.91ms DONE
-  2026-06-16 10:41:57 App\Jobs\QueueProbeJob ......................... RUNNING
-  2026-06-16 10:41:57 App\Jobs\QueueProbeJob .................... 25.95ms DONE
+  2026-06-17 09:23:29 App\Jobs\QueueProbeJob ......................... RUNNING
+  2026-06-17 09:23:29 App\Jobs\QueueProbeJob .................... 27.35ms DONE
+  2026-06-17 09:26:20 App\Jobs\RunProductMigrationJob ................ RUNNING
+  2026-06-17 09:26:23 App\Jobs\RunProductMigrationJob ................ 2s DONE
+  2026-06-17 09:26:23 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:25 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:25 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:26 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:26 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:27 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:27 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:29 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:29 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:30 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:30 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:31 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:31 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:33 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:33 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:34 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:34 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:35 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:35 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:36 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:36 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:38 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:38 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:39 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:39 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:40 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:40 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:42 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:42 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:43 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:43 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:44 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:44 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:47 App\Jobs\ProcessProductMigrationItemJob ........ 2s DONE
+  2026-06-17 09:26:47 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:48 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:48 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:49 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:49 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:51 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:51 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:52 App\Jobs\ProcessProductMigrationItemJob ........ 1s DONE
+  2026-06-17 09:26:52 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:55 App\Jobs\ProcessProductMigrationItemJob ........ 2s DONE
+  2026-06-17 09:26:55 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:26:58 App\Jobs\ProcessProductMigrationItemJob ........ 3s DONE
+  2026-06-17 09:26:58 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:27:01 App\Jobs\ProcessProductMigrationItemJob ........ 3s DONE
+  2026-06-17 09:27:01 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:27:04 App\Jobs\ProcessProductMigrationItemJob ........ 2s DONE
+  2026-06-17 09:27:04 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:27:04 App\Jobs\ProcessProductMigrationItemJob ... 31.85ms DONE
+  2026-06-17 09:27:04 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:27:04 App\Jobs\ProcessProductMigrationItemJob ... 28.50ms DONE
+  2026-06-17 09:27:04 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:27:04 App\Jobs\ProcessProductMigrationItemJob ... 27.94ms DONE
+  2026-06-17 09:27:04 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:27:04 App\Jobs\ProcessProductMigrationItemJob ... 30.68ms DONE
+  2026-06-17 09:27:04 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:27:04 App\Jobs\ProcessProductMigrationItemJob ... 28.68ms DONE
+  2026-06-17 09:27:04 App\Jobs\RunProductMigrationJob ................ RUNNING
+  2026-06-17 09:27:04 App\Jobs\RunProductMigrationJob ........... 28.31ms DONE
+  2026-06-17 09:27:04 App\Jobs\QueueProbeJob ......................... RUNNING
+  2026-06-17 09:27:04 App\Jobs\QueueProbeJob .................... 48.97ms DONE
+  2026-06-17 09:27:04 App\Jobs\QueueProbeJob ......................... RUNNING
+  2026-06-17 09:27:04 App\Jobs\QueueProbeJob .................... 23.51ms DONE
+  2026-06-17 09:27:04 App\Jobs\QueueProbeJob ......................... RUNNING
+  2026-06-17 09:27:04 App\Jobs\QueueProbeJob .................... 22.77ms DONE
+  2026-06-17 09:27:13 App\Jobs\QueueProbeJob ......................... RUNNING
+  2026-06-17 09:27:13 App\Jobs\QueueProbeJob .................... 23.18ms DONE
+  2026-06-17 09:28:23 App\Jobs\ProcessProductMigrationItemJob ........ RUNNING
+  2026-06-17 09:28:23 App\Jobs\ProcessProductMigrationItemJob ... 26.80ms DONE

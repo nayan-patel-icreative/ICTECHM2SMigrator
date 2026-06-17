@@ -333,13 +333,92 @@ class ProductPayloadMapper
     public function mapShopwareMetafields(array $parent, array $children = [], ?Shop $shop = null, string $priceMode = 'gross'): array
     {
         $out = [];
-        $this->pushProductMetafield($out, 'product_id', (string) ($parent['id'] ?? ''));
-        $this->pushProductMetafield($out, 'sku', (string) ($parent['sku'] ?? ''));
+        // Magento Custom ID (type: id)
+        $this->pushProductMetafield($out, 'custom_id', (string) ($parent['id'] ?? ''), 'id');
+
+        // Magento Product SKU
+        $this->pushProductMetafield($out, 'product_number', (string) ($parent['sku'] ?? ''));
+
+        // Magento Active status
+        $status = (int) ($parent['status'] ?? 1);
+        $this->pushProductMetafield($out, 'active', $status === 1 ? '1' : '0');
 
         // Weight
         $weight = $parent['weight'] ?? null;
         if (is_numeric($weight) && (float) $weight > 0) {
-            $this->pushProductMetafield($out, 'weight', (string)(float)$weight);
+            $this->pushProductMetafield($out, 'weight_kg', (string)(float)$weight);
+        }
+
+        // SEO Keywords
+        $seoKeywords = $this->getCustomAttributeValue($parent, 'meta_keyword');
+        if ($seoKeywords) {
+            $this->pushProductMetafield($out, 'seo_keywords', (string) $seoKeywords);
+        }
+
+        // Specification JSON
+        $specs = [];
+        $attrs = $parent['custom_attributes'] ?? [];
+        foreach ($attrs as $attr) {
+            $code = $attr['attribute_code'] ?? '';
+            $val = $attr['value'] ?? null;
+            if ($code !== '' && $val !== null) {
+                $specs[$code] = $val;
+            }
+        }
+        if (count($specs) > 0) {
+            $out[] = [
+                'namespace' => 'magento',
+                'key' => 'specification_json',
+                'type' => 'json',
+                'value' => json_encode($specs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            ];
+        }
+
+        // Price Mode
+        $this->pushProductMetafield($out, 'price_mode', $priceMode);
+
+        // Price Currency
+        $currency = 'USD';
+        if ($shop && $shop->magentoConnection) {
+            try {
+                $storeViews = app(\App\Services\Magento\MagentoClient::class)->getStoreViews($shop->magentoConnection);
+                foreach ($storeViews as $sv) {
+                    if ($sv['code'] === $shop->magentoConnection->store_view_code) {
+                        $currency = $sv['currency'] ?? 'USD';
+                        break;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Keep default USD on failure
+            }
+        }
+        $this->pushProductMetafield($out, 'price_currency', $currency);
+
+        // Tax details JSON
+        $taxClassId = $this->getCustomAttributeValue($parent, 'tax_class_id');
+        $taxDetails = [
+            'tax_class_id' => $taxClassId,
+            'taxable' => true,
+        ];
+        $out[] = [
+            'namespace' => 'magento',
+            'key' => 'tax_details_json',
+            'type' => 'json',
+            'value' => json_encode($taxDetails, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        ];
+
+        // Tier / Advanced Prices JSON
+        $tierPrices = $parent['tier_prices'] ?? [];
+        if (is_array($tierPrices) && count($tierPrices) > 0) {
+            $out[] = [
+                'namespace' => 'magento',
+                'key' => 'advanced_prices_json',
+                'type' => 'json',
+                'value' => json_encode($tierPrices, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            ];
+            $this->pushProductMetafield($out, 'advanced_price_count', (string) count($tierPrices));
+        } else {
+            $this->pushProductMetafield($out, 'advanced_price_count', '0');
         }
 
         return $out;

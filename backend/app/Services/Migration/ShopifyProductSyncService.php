@@ -10,13 +10,57 @@ class ShopifyProductSyncService
 {
     private ShopifyAdminGraphqlClient $client;
 
-    private const CUSTOM_ID_NAMESPACE = 'shopware';
+    private const CUSTOM_ID_NAMESPACE = 'magento';
 
     private const CUSTOM_ID_KEY = 'custom_id';
 
     public function __construct(ShopifyAdminGraphqlClient $client)
     {
         $this->client = $client;
+    }
+
+    /**
+     * Get Shopify product GID by handle.
+     */
+    public function getProductGidByHandle(Shop $shop, string $handle): ?string
+    {
+        $query = <<<'GQL'
+query GetProductByHandle($handle: String!) {
+  productByHandle(handle: $handle) {
+    id
+  }
+}
+GQL;
+        try {
+            $res = $this->client->query($shop, $query, ['handle' => $handle]);
+            if (isset($res['errors'])) {
+                return null;
+            }
+            return data_get($res, 'data.productByHandle.id');
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Check if a product exists in Shopify by GID.
+     */
+    public function productExists(Shop $shop, string $gid): bool
+    {
+        $query = <<<'GQL'
+query ProductExists($id: ID!) {
+  product(id: $id) { id }
+}
+GQL;
+        try {
+            $res = $this->client->query($shop, $query, ['id' => $gid]);
+            if (isset($res['errors'])) {
+                return false;
+            }
+            return !empty(data_get($res, 'data.product.id'));
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**
@@ -42,7 +86,7 @@ mutation UpsertProduct($input: ProductSetInput!, $identifier: ProductSetIdentifi
       variants(first: 100) {
         nodes {
           id
-          metafield(namespace: "shopware", key: "variant_id") {
+          metafield(namespace: "magento", key: "variant_id") {
             value
           }
         }
@@ -61,15 +105,52 @@ GQL;
             return ['userErrors' => [['message' => 'Missing Shopware sourceId for identifier']]];
         }
 
+        $existingGid = null;
+
+        // 1. Try to find GID from ShopifyIdMapping
+        $mapping = \App\Models\ShopifyIdMapping::query()
+            ->where('shop_id', $shop->id)
+            ->where('entity_type', 'product')
+            ->where('source_id', $shopwareId)
+            ->first();
+        if ($mapping && is_string($mapping->shopify_gid) && $mapping->shopify_gid !== '') {
+            if ($this->productExists($shop, $mapping->shopify_gid)) {
+                $existingGid = $mapping->shopify_gid;
+            } else {
+                $mapping->delete();
+            }
+        }
+
+        // 2. Try to find GID by handle
+        $handle = $productSetPayload['handle'] ?? null;
+        if (empty($existingGid) && is_string($handle) && $handle !== '') {
+            $existingGid = $this->getProductGidByHandle($shop, $handle);
+            if ($existingGid) {
+                // Save mapping so we don't have to look it up next time
+                \App\Models\ShopifyIdMapping::query()->updateOrCreate([
+                    'shop_id' => $shop->id,
+                    'entity_type' => 'product',
+                    'source_id' => $shopwareId,
+                ], [
+                    'shopify_gid' => $existingGid,
+                ]);
+            }
+        }
+
+        $identifier = [];
+        if ($existingGid) {
+            $identifier['id'] = $existingGid;
+        } else {
+            $identifier['customId'] = [
+                'namespace' => self::CUSTOM_ID_NAMESPACE,
+                'key' => self::CUSTOM_ID_KEY,
+                'value' => $shopwareId,
+            ];
+        }
+
         $res = $this->client->query($shop, $mutation, [
             'input' => $productSetPayload,
-            'identifier' => [
-                'customId' => [
-                    'namespace' => self::CUSTOM_ID_NAMESPACE,
-                    'key' => self::CUSTOM_ID_KEY,
-                    'value' => $shopwareId,
-                ],
-            ],
+            'identifier' => $identifier,
         ]);
 
         if (isset($res['errors'])) {
@@ -157,7 +238,7 @@ GQL;
             // 1. Ensure PRODUCT-level custom_id definition (required for ProductSetIdentifiers)
             $query = <<<'GQL'
 query FindDef {
-  metafieldDefinitions(first: 1, ownerType: PRODUCT, namespace: "shopware", key: "custom_id") {
+  metafieldDefinitions(first: 1, ownerType: PRODUCT, namespace: "magento", key: "custom_id") {
     nodes {
       id
       type {
@@ -252,7 +333,7 @@ GQL;
             // 2. Ensure PRODUCTVARIANT-level variant_id definition (required for image-to-variant mapping)
             $variantQuery = <<<'GQL'
 query FindVariantDef {
-  metafieldDefinitions(first: 1, ownerType: PRODUCTVARIANT, namespace: "shopware", key: "variant_id") {
+  metafieldDefinitions(first: 1, ownerType: PRODUCTVARIANT, namespace: "magento", key: "variant_id") {
     nodes { id }
   }
 }
@@ -268,7 +349,7 @@ GQL;
                 $variantCreate = $this->client->query($shop, $mutation, [
                     'definition' => [
                         'name' => 'Magento Variant ID',
-                        'namespace' => 'shopware',
+                        'namespace' => 'magento',
                         'key' => 'variant_id',
                         'ownerType' => 'PRODUCTVARIANT',
                         'type' => 'single_line_text_field',
@@ -315,7 +396,7 @@ GQL;
      */
     private function ensureCommonProductMetafieldDefinitions(Shop $shop): array
     {
-        $cacheKey = 'shopify:product_common_metafields_ensured_v3:'.$shop->id;
+        $cacheKey = 'shopify:product_common_metafields_ensured_v5:'.$shop->id;
         if (Cache::get($cacheKey)) {
             return ['ok' => true];
         }
@@ -331,34 +412,21 @@ GQL;
             $this->cleanupObsoleteMetafieldDefinitions($shop);
 
             $definitions = [
-                ['name' => 'SEO Keywords',           'namespace' => 'shopware', 'key' => 'seo_keywords',         'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'SEO Source Path',         'namespace' => 'shopware', 'key' => 'seo_path_source',      'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Magento Product ID',     'namespace' => 'shopware', 'key' => 'product_id',           'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Magento Product Number', 'namespace' => 'shopware', 'key' => 'product_number',       'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Magento Active',         'namespace' => 'shopware', 'key' => 'active',               'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Magento Weight (kg)',    'namespace' => 'shopware', 'key' => 'weight_kg',            'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Spec Width',              'namespace' => 'shopware', 'key' => 'spec_width',           'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Spec Height',             'namespace' => 'shopware', 'key' => 'spec_height',          'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Spec Length',             'namespace' => 'shopware', 'key' => 'spec_length',          'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Spec Weight',             'namespace' => 'shopware', 'key' => 'spec_weight',          'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Spec Purchase Unit',      'namespace' => 'shopware', 'key' => 'spec_purchase_unit',   'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Spec Reference Unit',     'namespace' => 'shopware', 'key' => 'spec_reference_unit',  'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Spec Pack Unit',          'namespace' => 'shopware', 'key' => 'spec_pack_unit',       'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Spec Pack Unit Plural',   'namespace' => 'shopware', 'key' => 'spec_pack_unit_plural','ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Spec Unit',               'namespace' => 'shopware', 'key' => 'spec_unit',            'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Spec Properties',         'namespace' => 'shopware', 'key' => 'spec_properties',      'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Specification JSON',      'namespace' => 'shopware', 'key' => 'specification_json',   'ownerType' => 'PRODUCT', 'type' => 'json',                   'pin' => true],
-                ['name' => 'Price Currency',          'namespace' => 'shopware', 'key' => 'price_currency',        'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Tax Rate',               'namespace' => 'shopware', 'key' => 'tax_rate',               'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Tax Name',               'namespace' => 'shopware', 'key' => 'tax_name',               'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Advanced Price Count',   'namespace' => 'shopware', 'key' => 'advanced_price_count',   'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Advanced Prices JSON',   'namespace' => 'shopware', 'key' => 'advanced_prices_json',   'ownerType' => 'PRODUCT', 'type' => 'json',                   'pin' => true],
-                ['name' => 'Price Mode',             'namespace' => 'shopware', 'key' => 'price_mode',             'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
-                ['name' => 'Magento Download Links', 'namespace' => 'shopware', 'key' => 'download_links',       'ownerType' => 'PRODUCT', 'type' => 'list.link',              'pin' => true],
+                ['name' => 'SEO Keywords',           'namespace' => 'magento', 'key' => 'seo_keywords',         'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
+                ['name' => 'Magento Product SKU',    'namespace' => 'magento', 'key' => 'product_number',       'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
+                ['name' => 'Magento Active',         'namespace' => 'magento', 'key' => 'active',               'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
+                ['name' => 'Magento Weight (kg)',    'namespace' => 'magento', 'key' => 'weight_kg',            'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
+                ['name' => 'Specification JSON',      'namespace' => 'magento', 'key' => 'specification_json',   'ownerType' => 'PRODUCT', 'type' => 'json',                   'pin' => true],
+                ['name' => 'Price Currency',          'namespace' => 'magento', 'key' => 'price_currency',        'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
+                ['name' => 'Magento Tax Details JSON','namespace' => 'magento', 'key' => 'tax_details_json',     'ownerType' => 'PRODUCT', 'type' => 'json',                   'pin' => true],
+                ['name' => 'Advanced Price Count',   'namespace' => 'magento', 'key' => 'advanced_price_count',   'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
+                ['name' => 'Advanced Prices JSON',   'namespace' => 'magento', 'key' => 'advanced_prices_json',   'ownerType' => 'PRODUCT', 'type' => 'json',                   'pin' => true],
+                ['name' => 'Price Mode',             'namespace' => 'magento', 'key' => 'price_mode',             'ownerType' => 'PRODUCT', 'type' => 'single_line_text_field', 'pin' => true],
+                ['name' => 'Magento Download Links', 'namespace' => 'magento', 'key' => 'download_links',       'ownerType' => 'PRODUCT', 'type' => 'list.link',              'pin' => true],
             ];
 
-            // --- Step 1: Fetch all existing shopware-namespace definitions in one API call ---
-            $existingKeys = $this->fetchExistingProductMetafieldKeys($shop, 'shopware');
+            // --- Step 1: Fetch all existing magento-namespace definitions in one API call ---
+            $existingKeys = $this->fetchExistingProductMetafieldKeys($shop, 'magento');
             if ($existingKeys === null) {
                 // API error — fall back to attempting all creates (safe, "key is in use" is handled below)
                 $existingKeys = [];
@@ -578,9 +646,9 @@ GQL;
 
         // Fetch existing keys to avoid duplicate creates
         if ($ownerType === 'PRODUCT') {
-            $existingKeys = $this->fetchExistingProductMetafieldKeys($shop, 'shopware');
+            $existingKeys = $this->fetchExistingProductMetafieldKeys($shop, 'magento');
         } else {
-            $existingKeys = $this->fetchExistingVariantMetafieldKeys($shop, 'shopware');
+            $existingKeys = $this->fetchExistingVariantMetafieldKeys($shop, 'magento');
         }
 
         if ($existingKeys === null) {
@@ -603,7 +671,7 @@ GQL;
 
         $definition = [
             'name'      => 'Magento Download Links',
-            'namespace' => 'shopware',
+            'namespace' => 'magento',
             'key'       => 'download_links',
             'ownerType' => $ownerType,
             'type'      => 'list.link',
@@ -707,6 +775,20 @@ GQL;
             'digital_file_3',
             'digital_file_4',
             'digital_file_5',
+            'product_id',
+            'seo_path_source',
+            'tax_rate',
+            'tax_name',
+            'spec_weight',
+            'spec_purchase_unit',
+            'spec_reference_unit',
+            'spec_pack_unit',
+            'spec_pack_unit_plural',
+            'spec_unit',
+            'spec_properties',
+            'spec_width',
+            'spec_height',
+            'spec_length',
         ];
 
         $deleteMutation = <<<'GQL'
@@ -723,7 +805,8 @@ GQL;
 
         // Clean up both PRODUCT and PRODUCTVARIANT definitions
         foreach (['PRODUCT', 'PRODUCTVARIANT'] as $ownerType) {
-            $query = <<<'GQL'
+            foreach (['magento', 'shopware'] as $ns) {
+                $query = <<<'GQL'
 query GetDefs($namespace: String!, $ownerType: MetafieldOwnerType!) {
   metafieldDefinitions(first: 250, ownerType: $ownerType, namespace: $namespace) {
     nodes {
@@ -734,55 +817,57 @@ query GetDefs($namespace: String!, $ownerType: MetafieldOwnerType!) {
 }
 GQL;
 
-            $res = $this->client->query($shop, $query, [
-                'namespace' => 'shopware',
-                'ownerType' => $ownerType,
-            ]);
+                $res = $this->client->query($shop, $query, [
+                    'namespace' => $ns,
+                    'ownerType' => $ownerType,
+                ]);
 
-            if (isset($res['errors'])) {
-                continue;
-            }
-
-            $nodes = data_get($res, 'data.metafieldDefinitions.nodes', []);
-            if (!is_array($nodes)) {
-                continue;
-            }
-
-            foreach ($nodes as $node) {
-                $id = (string) ($node['id'] ?? '');
-                $key = (string) ($node['key'] ?? '');
-                if ($id === '' || $key === '') {
+                if (isset($res['errors'])) {
                     continue;
                 }
 
-                $shouldDelete = in_array($key, $obsoleteKeys, true) || str_starts_with($key, 'variant_digital_');
-                if ($shouldDelete) {
-                    \Illuminate\Support\Facades\Log::info("Deleting obsolete metafield definition in Shopify", [
-                        'shop' => $shop->shop_domain,
-                        'ownerType' => $ownerType,
-                        'key' => $key,
-                        'id' => $id,
-                    ]);
+                $nodes = data_get($res, 'data.metafieldDefinitions.nodes', []);
+                if (!is_array($nodes)) {
+                    continue;
+                }
 
-                    $delRes = $this->client->query($shop, $deleteMutation, [
-                        'id' => $id,
-                        'deleteAllAssociatedMetafields' => true,
-                    ]);
+                foreach ($nodes as $node) {
+                    $id = (string) ($node['id'] ?? '');
+                    $key = (string) ($node['key'] ?? '');
+                    if ($id === '' || $key === '') {
+                        continue;
+                    }
 
-                    if (isset($delRes['errors'])) {
-                        \Illuminate\Support\Facades\Log::warning("Failed to delete definition in Shopify", [
+                    $shouldDelete = ($ns === 'shopware') || in_array($key, $obsoleteKeys, true) || str_starts_with($key, 'variant_digital_');
+                    if ($shouldDelete) {
+                        \Illuminate\Support\Facades\Log::info("Deleting obsolete metafield definition in Shopify", [
                             'shop' => $shop->shop_domain,
+                            'ownerType' => $ownerType,
+                            'namespace' => $ns,
+                            'key' => $key,
                             'id' => $id,
-                            'errors' => $delRes['errors'],
                         ]);
-                    } else {
-                        $userErrors = data_get($delRes, 'data.metafieldDefinitionDelete.userErrors', []);
-                        if (is_array($userErrors) && count($userErrors) > 0) {
-                            \Illuminate\Support\Facades\Log::warning("User errors deleting definition in Shopify", [
+
+                        $delRes = $this->client->query($shop, $deleteMutation, [
+                            'id' => $id,
+                            'deleteAllAssociatedMetafields' => true,
+                        ]);
+
+                        if (isset($delRes['errors'])) {
+                            \Illuminate\Support\Facades\Log::warning("Failed to delete definition in Shopify", [
                                 'shop' => $shop->shop_domain,
                                 'id' => $id,
-                                'userErrors' => $userErrors,
+                                'errors' => $delRes['errors'],
                             ]);
+                        } else {
+                            $userErrors = data_get($delRes, 'data.metafieldDefinitionDelete.userErrors', []);
+                            if (is_array($userErrors) && count($userErrors) > 0) {
+                                \Illuminate\Support\Facades\Log::warning("User errors deleting definition in Shopify", [
+                                    'shop' => $shop->shop_domain,
+                                    'id' => $id,
+                                    'userErrors' => $userErrors,
+                                ]);
+                            }
                         }
                     }
                 }

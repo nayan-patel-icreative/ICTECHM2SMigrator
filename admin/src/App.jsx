@@ -1462,7 +1462,7 @@ function App() {
                   autoComplete="off"
                 />
                 <TextField
-                  label={secretSaved ? 'Access Token (saved)' : 'Access Token'}
+                  label={secretSaved ? 'Secret Access Token (saved)' : 'Access Token'}
                   value={secretSaved && !editingSecret ? '••••••••••••••••' : accessToken}
                   readOnly={secretSaved && !editingSecret}
                   onChange={(v) => {
@@ -2921,13 +2921,13 @@ function App() {
                                               <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px 16px', fontSize: '13px' }}>
                                                 <Text as="span" tone="subdued">Magento Customer ID:</Text>
                                                 <Text as="span" fontWeight="medium">{it.source_id}</Text>
-                                                
+
                                                 <Text as="span" tone="subdued">Full Name:</Text>
                                                 <Text as="span">{it.first_name || '-'} {it.last_name || '-'}</Text>
-                                                
+
                                                 <Text as="span" tone="subdued">Email:</Text>
                                                 <Text as="span">{it.email || '-'}</Text>
-                                                
+
                                                 <Text as="span" tone="subdued">Phone:</Text>
                                                 <Text as="span">{it.payload?.phone || it.shopware_raw?.telephone || '-'}</Text>
 
@@ -2972,12 +2972,12 @@ function App() {
                                               {it.payload?.addresses && it.payload.addresses.length > 0 ? (
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                                   {it.payload.addresses.map((addr, idx) => (
-                                                    <div 
-                                                      key={idx} 
-                                                      style={{ 
-                                                        padding: '10px', 
-                                                        border: '1px solid var(--p-color-border-subdued)', 
-                                                        borderRadius: '6px', 
+                                                    <div
+                                                      key={idx}
+                                                      style={{
+                                                        padding: '10px',
+                                                        border: '1px solid var(--p-color-border-subdued)',
+                                                        borderRadius: '6px',
                                                         background: 'var(--p-color-bg-surface)',
                                                         fontSize: '13px'
                                                       }}

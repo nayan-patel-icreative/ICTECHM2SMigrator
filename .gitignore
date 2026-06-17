@@ -1,0 +1,16 @@
+# Graphify outputs
+graphify-out/
+
+# Development server PID and log files
+.admin-dev.log
+.admin.pid
+.backend.pid
+.dev-port
+.queue.pid
+.tunnel.log
+
+# Agent local configuration
+.gemini/
+.agents/
+
+

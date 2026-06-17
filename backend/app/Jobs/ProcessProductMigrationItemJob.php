@@ -508,7 +508,7 @@ class ProcessProductMigrationItemJob implements ShouldQueue
                             if (count($links) > 0) {
                                 $variantMfs = [
                                     [
-                                        'namespace' => 'shopware',
+                                        'namespace' => 'magento',
                                         'key'       => 'download_links',
                                         'type'      => 'list.link',
                                         'value'     => json_encode($links, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
@@ -550,7 +550,7 @@ class ProcessProductMigrationItemJob implements ShouldQueue
 
                         $digitalMetafields = [
                             [
-                                'namespace' => 'shopware',
+                                'namespace' => 'magento',
                                 'key'       => 'download_links',
                                 'type'      => 'list.link',
                                 'value'     => json_encode($uniqueLinks, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),

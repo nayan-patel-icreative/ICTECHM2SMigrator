@@ -154,7 +154,8 @@ class ProcessProductMigrationItemJob implements ShouldQueue
 
             $tStep = microtime(true);
             $payload = $mapper->mapParentWithVariants($parent, $children, (string) $run->shopify_location_gid, $shop->id, $priceMode);
-            $fp = $fingerprints->make($payload);
+            $metafieldsForFp = $mapper->mapShopwareMetafields($parent, $children, $shop, $priceMode);
+            $fp = $fingerprints->make(array_merge($payload, ['metafields' => $metafieldsForFp]));
             $tMap += (microtime(true) - $tStep);
 
             $variantCountForReport = count(is_array($children) ? $children : []);

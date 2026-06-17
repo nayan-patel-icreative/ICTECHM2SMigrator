@@ -356,12 +356,45 @@ class ProductPayloadMapper
         }
 
         // Specification JSON
+        $ignoredAttributes = [
+            'image',
+            'small_image',
+            'thumbnail',
+            'image_label',
+            'small_image_label',
+            'thumbnail_label',
+            'meta_title',
+            'meta_keyword',
+            'meta_description',
+            'description',
+            'url_key',
+            'options_container',
+            'required_options',
+            'has_options',
+            'gift_message_available',
+            'msrp_display_actual_price_type',
+            'tax_class_id',
+            'category_ids',
+            'custom_layout',
+            'custom_layout_update_xml',
+            'custom_design',
+            'page_layout',
+            'status',
+            'visibility',
+            'news_from_date',
+            'news_to_date',
+            'special_price',
+            'special_from_date',
+            'special_to_date',
+            'tier_price',
+        ];
+
         $specs = [];
         $attrs = $parent['custom_attributes'] ?? [];
         foreach ($attrs as $attr) {
             $code = $attr['attribute_code'] ?? '';
             $val = $attr['value'] ?? null;
-            if ($code !== '' && $val !== null) {
+            if ($code !== '' && $val !== null && !in_array($code, $ignoredAttributes, true)) {
                 $specs[$code] = $val;
             }
         }
@@ -399,7 +432,62 @@ class ProductPayloadMapper
         $taxDetails = [
             'tax_class_id' => $taxClassId,
             'taxable' => true,
+            'rules' => [],
         ];
+
+        if ($shop && $shop->magentoConnection && $taxClassId !== null && $taxClassId !== '') {
+            $taxRules = \Illuminate\Support\Facades\Cache::remember('magento_tax_rules:' . $shop->magentoConnection->id, now()->addHour(), function () use ($shop) {
+                try {
+                    $client = app(\App\Services\Magento\MagentoClient::class);
+                    $query = $client->buildSearchCriteria(200, 1);
+                    $res = $client->request($shop->magentoConnection, 'GET', '/V1/taxRules/search', ['query' => $query]);
+                    return $res['items'] ?? [];
+                } catch (\Throwable $e) {
+                    return [];
+                }
+            });
+
+            $taxRates = \Illuminate\Support\Facades\Cache::remember('magento_tax_rates:' . $shop->magentoConnection->id, now()->addHour(), function () use ($shop) {
+                try {
+                    $client = app(\App\Services\Magento\MagentoClient::class);
+                    $query = $client->buildSearchCriteria(500, 1);
+                    $res = $client->request($shop->magentoConnection, 'GET', '/V1/taxRates/search', ['query' => $query]);
+                    return $res['items'] ?? [];
+                } catch (\Throwable $e) {
+                    return [];
+                }
+            });
+
+            $matchedRules = [];
+            foreach ($taxRules as $rule) {
+                $productClasses = array_map('intval', $rule['product_tax_class_ids'] ?? []);
+                if (in_array((int)$taxClassId, $productClasses, true)) {
+                    $ruleRates = [];
+                    $rateIds = array_map('intval', $rule['tax_rate_ids'] ?? []);
+                    foreach ($rateIds as $rateId) {
+                        foreach ($taxRates as $rate) {
+                            if ((int)($rate['id'] ?? 0) === $rateId) {
+                                $ruleRates[] = [
+                                    'id' => $rateId,
+                                    'code' => $rate['code'] ?? '',
+                                    'rate' => (float)($rate['rate'] ?? 0.0),
+                                    'country' => $rate['tax_country_id'] ?? '',
+                                    'region' => $rate['region_name'] ?? $rate['tax_region_id'] ?? '',
+                                    'postcode' => $rate['tax_postcode'] ?? '',
+                                ];
+                            }
+                        }
+                    }
+                    $matchedRules[] = [
+                        'id' => $rule['id'] ?? null,
+                        'code' => $rule['code'] ?? '',
+                        'rates' => $ruleRates,
+                    ];
+                }
+            }
+            $taxDetails['rules'] = $matchedRules;
+        }
+
         $out[] = [
             'namespace' => 'magento',
             'key' => 'tax_details_json',

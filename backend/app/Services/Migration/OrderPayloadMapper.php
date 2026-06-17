@@ -27,6 +27,14 @@ class OrderPayloadMapper
         $billing = $this->finalizeMailingAddressForShopify($this->resolveBillingAddress($order));
         $shipping = $this->finalizeMailingAddressForShopify($this->resolveShippingAddress($order), $billing);
 
+        try {
+            $stateMapper = (function_exists('app') && app()->bound('config'))
+                ? app(\App\Services\Migration\StateAssignmentMapper::class)
+                : null;
+        } catch (\Throwable) {
+            $stateMapper = null;
+        }
+
         $lineItems = $this->mapLineItems($order, $currency);
         if (count($lineItems) === 0) {
             $lineItems[] = [
@@ -41,17 +49,16 @@ class OrderPayloadMapper
             ];
         }
 
-        $shippingLines = $this->mapShippingLines($order, $currency);
+        $shippingLines = $this->mapShippingLines($shop, $order, $currency, $stateMapper);
 
         // Map status
         $status = strtolower((string) ($order['status'] ?? 'pending'));
         $state = strtolower((string) ($order['state'] ?? 'new'));
 
-        try {
-            $stateMapper = app(\App\Services\Migration\StateAssignmentMapper::class);
+        if ($stateMapper) {
             $financialStatus = $stateMapper->resolveFinancialStatus($shop, $order);
             $fulfillmentStatus = $stateMapper->resolveFulfillmentStatus($shop, $order) ?: 'UNFULFILLED';
-        } catch (\Throwable) {
+        } else {
             $financialStatus = 'PENDING';
             $fulfillmentStatus = 'UNFULFILLED';
 
@@ -143,31 +150,61 @@ class OrderPayloadMapper
             $payload['fulfillment'] = $fulfillmentInput;
         }
 
-        // Transactions
-        $transactions = [];
-        $paymentCapture = null;
-        if ($financialStatus === 'PAID') {
-            $paymentCapture = [
-                'amount' => $this->formatAmount((float) ($order['grand_total'] ?? 0)),
+        // Build transactions suitable for orderCreate (works on all Shopify plans).
+        // Shopify's orderCreate mutation for historical imports honours the financialStatus
+        // field directly; we additionally pass a matching transaction so the order ledger
+        // is consistent. orderCreateManualPayment is Shopify Plus-only and is NOT used.
+        $transactions  = [];
+        $paymentCapture = null; // Kept for interface compatibility; no longer used.
+        $txAmountSet = [
+            'shopMoney' => [
+                'amount'       => $this->formatAmount((float) ($order['grand_total'] ?? 0)),
                 'currencyCode' => $currency,
-                'paymentMethodName' => $paymentMethod !== '' ? $paymentMethod : 'Magento Payment',
-                'processedAt' => $processedAt !== '' ? $processedAt : null,
-            ];
-            // When using payment capture step, create order financialStatus as PENDING and then record manual payment transaction.
-            $payload['financialStatus'] = 'PENDING';
-        } else {
-            $transactions[] = [
-                'amountSet' => [
-                    'shopMoney' => [
-                        'amount' => $this->formatAmount((float) ($order['grand_total'] ?? 0)),
-                        'currencyCode' => $currency,
-                    ],
-                ],
-                'gateway' => $paymentMethod !== '' ? $paymentMethod : 'manual',
-                'kind' => 'SALE',
-                'status' => 'SUCCESS',
-            ];
+            ],
+        ];
+        $gateway = $paymentMethod !== '' ? $paymentMethod : 'manual';
+        if ($stateMapper && $paymentMethod !== '') {
+            $mappedPayment = $stateMapper->mappedValue($shop, 'payment_methods', $paymentMethod);
+            if ($mappedPayment !== null && $mappedPayment !== '') {
+                $gatewayLabel = $stateMapper->optionLabel('payment_methods', $mappedPayment);
+                if ($gatewayLabel !== '') {
+                    $gateway = $gatewayLabel;
+                }
+            }
         }
+
+        switch ($financialStatus) {
+            case 'PAID':
+            case 'PARTIALLY_PAID':
+            case 'REFUNDED':
+            case 'PARTIALLY_REFUNDED':
+                // A completed SALE transaction makes the order ledger consistent.
+                // For REFUNDED/PARTIALLY_REFUNDED the financialStatus field drives the
+                // displayed status; Shopify does not require a separate refund transaction
+                // in the historical import mutation.
+                $transactions[] = [
+                    'amountSet' => $txAmountSet,
+                    'gateway'   => $gateway,
+                    'kind'      => 'SALE',
+                    'status'    => 'SUCCESS',
+                ];
+                break;
+
+            case 'VOIDED':
+                $transactions[] = [
+                    'amountSet' => $txAmountSet,
+                    'gateway'   => $gateway,
+                    'kind'      => 'VOID',
+                    'status'    => 'SUCCESS',
+                ];
+                break;
+
+            case 'PENDING':
+            default:
+                // No transaction entry — order stays pending.
+                break;
+        }
+
         $payload['transactions'] = $transactions;
 
         $customAttributes = [];
@@ -219,8 +256,7 @@ class OrderPayloadMapper
         }
 
         return [
-            'locationId' => $locationGid,
-            'notifyMerchant' => false,
+            'locationId'     => $locationGid,
             'notifyCustomer' => false,
         ];
     }
@@ -266,28 +302,80 @@ class OrderPayloadMapper
                 $payload['sku'] = $sku;
             }
 
+            $taxAmount = (float) ($li['tax_amount'] ?? 0);
+            if ($taxAmount > 0) {
+                $taxPercent = (float) ($li['tax_percent'] ?? 0);
+                $rate = $taxPercent > 0 ? ($taxPercent / 100) : 0.0;
+                $payload['taxLines'] = [
+                    [
+                        'title' => 'Tax',
+                        'rate' => $rate,
+                        'priceSet' => [
+                            'shopMoney' => [
+                                'amount' => $this->formatAmount($taxAmount),
+                                'currencyCode' => $currency,
+                            ],
+                        ],
+                    ]
+                ];
+                $payload['taxable'] = true;
+            }
+
             $out[] = $payload;
         }
 
         return $out;
     }
 
-    private function mapShippingLines(array $order, string $currency): array
+    private function mapShippingLines(?Shop $shop, array $order, string $currency, ?StateAssignmentMapper $stateMapper = null): array
     {
-        $title = (string) ($order['shipping_description'] ?? 'Shipping');
-        $shippingAmount = (float) ($order['shipping_amount'] ?? 0);
+        $rawTitle = (string) ($order['shipping_description'] ?? 'Shipping');
+        $title = $rawTitle;
 
-        return [
-            [
-                'title' => $title !== '' ? $title : 'Shipping',
-                'priceSet' => [
-                    'shopMoney' => [
-                        'amount' => $this->formatAmount($shippingAmount),
-                        'currencyCode' => $currency,
-                    ],
+        if ($shop && $stateMapper) {
+            $mapped = $stateMapper->mappedValue($shop, 'shipping_methods', $rawTitle);
+            if ($mapped !== null && $mapped !== '') {
+                $title = $stateMapper->optionLabel('shipping_methods', $mapped);
+            } else {
+                $techCode = (string) ($order['shipping_method'] ?? '');
+                if ($techCode !== '') {
+                    $mapped = $stateMapper->mappedValue($shop, 'shipping_methods', $techCode);
+                    if ($mapped !== null && $mapped !== '') {
+                        $title = $stateMapper->optionLabel('shipping_methods', $mapped);
+                    }
+                }
+            }
+        }
+
+        $shippingAmount = (float) ($order['shipping_amount'] ?? 0);
+        $shippingTaxAmount = (float) ($order['shipping_tax_amount'] ?? 0);
+
+        $line = [
+            'title' => $title !== '' ? $title : 'Shipping',
+            'priceSet' => [
+                'shopMoney' => [
+                    'amount' => $this->formatAmount($shippingAmount),
+                    'currencyCode' => $currency,
                 ],
-            ]
+            ],
         ];
+
+        if ($shippingTaxAmount > 0) {
+            $line['taxLines'] = [
+                [
+                    'title' => 'Shipping Tax',
+                    'rate' => 0.0,
+                    'priceSet' => [
+                        'shopMoney' => [
+                            'amount' => $this->formatAmount($shippingTaxAmount),
+                            'currencyCode' => $currency,
+                        ],
+                    ],
+                ]
+            ];
+        }
+
+        return [$line];
     }
 
     /**

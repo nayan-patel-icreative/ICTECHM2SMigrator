@@ -116,6 +116,8 @@ class ProcessOrderMigrationItemJob implements ShouldQueue
             $paymentCapture = isset($mapped['payment_capture']) && is_array($mapped['payment_capture'])
                 ? $mapped['payment_capture']
                 : null;
+            // Note: paymentCapture is kept for interface compatibility but is no longer used.
+            // Financial status is driven by the transaction included in orderCreate directly.
 
             if (!is_array($payload)) {
                 $this->markFailed($run, $item, 'Order payload mapping failed', ['source_id' => $sourceId]);
@@ -440,19 +442,6 @@ class ProcessOrderMigrationItemJob implements ShouldQueue
 
             $this->shopLevelThrottleDelaySeconds($shop->id, false);
             $this->applyMinIntervalCooldownAfterSuccess($shop->id);
-
-            if (is_array($paymentCapture) && $paymentCapture !== []) {
-                $manualPay = $sync->createManualPayment($shop, $orderGid, $paymentCapture);
-                if (!empty($manualPay['errors']) || !empty($manualPay['userErrors'])) {
-                    Log::warning('Post-create manual payment failed (order still created)', [
-                        'run_id' => $run->id,
-                        'shop' => $shop->shop_domain,
-                        'source_id' => $sourceId,
-                        'order_gid' => $orderGid,
-                        'response' => $manualPay,
-                    ]);
-                }
-            }
 
             $targetFulfillment = (string) ($payload['fulfillmentStatus'] ?? '');
             if (in_array($targetFulfillment, ['FULFILLED', 'PARTIAL'], true) && $locationGid !== '') {

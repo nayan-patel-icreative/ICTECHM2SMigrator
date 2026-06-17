@@ -132,7 +132,7 @@ class OrderPayloadMapperMethodsTest extends TestCase
             'shipping_amount' => 5.00,
         ];
 
-        $res = $this->invokePrivate($mapper, 'mapShippingLines', $order, 'USD');
+        $res = $this->invokePrivate($mapper, 'mapShippingLines', null, $order, 'USD');
 
         $this->assertCount(1, $res);
         $this->assertSame('Flat Rate - Fixed', $res[0]['title']);
@@ -178,9 +178,15 @@ class OrderPayloadMapperMethodsTest extends TestCase
         $mapped = $mapper->mapOrder($shop, $order);
 
         $this->assertIsArray($mapped);
-        $this->assertSame('PENDING', $mapped['order']['financialStatus']);
-        $this->assertSame('104.99', $mapped['payment_capture']['amount']);
-        $this->assertSame('checkmo', $mapped['payment_capture']['paymentMethodName']);
+        // financialStatus must be PAID (from the default processing→paid mapping)
+        $this->assertSame('PAID', $mapped['order']['financialStatus']);
+        // payment_capture is no longer used; it is null
+        $this->assertNull($mapped['payment_capture']);
+        // A SALE SUCCESS transaction must be present in the payload
+        $transactions = $mapped['order']['transactions'] ?? [];
+        $this->assertCount(1, $transactions);
+        $this->assertSame('SALE',    $transactions[0]['kind']);
+        $this->assertSame('SUCCESS', $transactions[0]['status']);
         $this->assertSame('customer@example.com', $mapped['order']['email']);
         $this->assertSame('EUR', $mapped['order']['currency']);
         $this->assertSame('100000099', $mapped['order']['name']);

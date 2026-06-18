@@ -179,6 +179,33 @@ class MagentoClient
                         'store_group_name' => $groupMap[$gId] ?? '',
                     ];
                 }
+
+                // Filter store views to only those belonging to the configured store's website scope
+                $defaultCode = $conn->store_view_code ?: 'default';
+                $targetWebsiteId = null;
+
+                foreach ($out as $sv) {
+                    if ($sv['code'] === $defaultCode) {
+                        $targetWebsiteId = $sv['website_id'];
+                        break;
+                    }
+                }
+
+                if ($targetWebsiteId === null) {
+                    foreach ($out as $sv) {
+                        if ($sv['website_id'] === '1') {
+                            $targetWebsiteId = '1';
+                            break;
+                        }
+                    }
+                }
+
+                if ($targetWebsiteId !== null) {
+                    $out = array_values(array_filter($out, function ($sv) use ($targetWebsiteId) {
+                        return $sv['website_id'] === $targetWebsiteId;
+                    }));
+                }
+
                 return $out;
             } catch (\Throwable $e) {
                 Log::warning('Failed to fetch store views, falling back', ['error' => $e->getMessage()]);

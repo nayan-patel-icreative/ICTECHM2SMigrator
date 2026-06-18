@@ -45,6 +45,7 @@ class ShopifyCollectionSyncService
         }
 
         $result = $this->addProductToCollection($shop, $collectionGid, $productGid);
+        $result['collectionGid'] = $collectionGid;
 
         // --- Non-blocking collection translation sync ---
         if ($collectionGid && count($enabledLanguages) > 0) {

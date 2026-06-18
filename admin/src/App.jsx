@@ -158,8 +158,8 @@ function LanguageSelectionCard({ api, languageConfig, onSave, saving }) {
                   padding: '8px 10px',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  background: lang.enabled ? 'rgba(26,127,90,0.08)' : 'transparent',
-                  border: lang.enabled ? '1px solid rgba(26,127,90,0.3)' : '1px solid transparent',
+                  background: lang.enabled ? 'rgba(26,127,90,0.08)' : 'var(--p-color-bg-surface)',
+                  border: lang.enabled ? '1px solid rgba(26,127,90,0.3)' : '1px solid var(--p-color-border-subdued)',
                   transition: 'all 0.15s ease',
                 }}
               >
@@ -4381,53 +4381,87 @@ function MarketsMigrationCard({
               </InlineStack>
 
               <div style={{
-                border: '1px solid var(--p-color-border-subdued)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                padding: '16px',
+                background: 'var(--p-color-bg-surface-secondary)',
                 borderRadius: '8px',
-                overflow: 'hidden',
+                border: '1px solid var(--p-color-border-subdued)',
               }}>
-                {marketPreviewItems.map((it, idx) => {
-                  const checked = selectedIds.includes(it.source_id)
-                  return (
-                    <label
-                      key={it.source_id}
-                      htmlFor={`ch-${it.source_id}`}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'auto 1fr auto',
-                        gap: '12px',
-                        alignItems: 'center',
-                        padding: '12px 16px',
-                        cursor: 'pointer',
-                        background: checked
-                          ? 'rgba(26,127,90,0.06)'
-                          : idx % 2 === 0 ? 'var(--p-color-bg-surface)' : 'var(--p-color-bg-surface-secondary)',
-                        borderBottom: idx < marketPreviewItems.length - 1 ? '1px solid var(--p-color-border-subdued)' : 'none',
-                        transition: 'background 0.15s',
-                      }}
-                    >
-                      <input
-                        id={`ch-${it.source_id}`}
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleChannel(it.source_id)}
-                        style={{ accentColor: '#1a7f5a', width: '16px', height: '16px', cursor: 'pointer', flexShrink: 0 }}
-                      />
-                      <div>
-                        <Text as="p" variant="bodyMd" fontWeight={checked ? 'semibold' : 'regular'}>
-                          {it.name || it.source_id}
-                        </Text>
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Country: {it.default_country} · Locale: {it.default_locale} · {it.domains} domain{it.domains !== 1 ? 's' : ''}
-                        </Text>
+                {(() => {
+                  const grouped = {}
+                  marketPreviewItems.forEach((it) => {
+                    const wName = it.website_name || 'Main Website'
+                    const gName = it.store_group_name || 'Main Store'
+                    if (!grouped[wName]) grouped[wName] = {}
+                    if (!grouped[wName][gName]) grouped[wName][gName] = []
+                    grouped[wName][gName].push(it)
+                  })
+
+                  return Object.entries(grouped).map(([websiteName, groups]) => (
+                    <div key={websiteName} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ borderBottom: '1px solid var(--p-color-border-subdued)', paddingBottom: '4px' }}>
+                        <Text as="h4" variant="headingXs" fontWeight="bold">{websiteName}</Text>
                       </div>
-                      <Text as="span" variant="bodySm" tone="subdued">
-                        <code style={{ fontSize: '12px', background: 'var(--p-color-bg-surface-secondary)', padding: '2px 6px', borderRadius: '4px' }}>
-                          {it.proposed_subfolder}
-                        </code>
-                      </Text>
-                    </label>
-                  )
-                })}
+                      <div style={{ paddingLeft: '8px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {Object.entries(groups).map(([groupName, channels]) => (
+                          <div key={groupName} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <Text as="p" variant="bodySm" tone="subdued" fontWeight="medium">{groupName}</Text>
+                            <div style={{
+                              border: '1px solid var(--p-color-border-subdued)',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              background: 'var(--p-color-bg-surface)',
+                            }}>
+                              {channels.map((it, idx) => {
+                                const checked = selectedIds.includes(it.source_id)
+                                return (
+                                  <label
+                                    key={it.source_id}
+                                    htmlFor={`ch-${it.source_id}`}
+                                    style={{
+                                      display: 'grid',
+                                      gridTemplateColumns: 'auto 1fr auto',
+                                      gap: '12px',
+                                      alignItems: 'center',
+                                      padding: '12px 16px',
+                                      cursor: 'pointer',
+                                      background: checked ? 'rgba(26,127,90,0.06)' : 'transparent',
+                                      borderBottom: idx < channels.length - 1 ? '1px solid var(--p-color-border-subdued)' : 'none',
+                                      transition: 'background 0.15s',
+                                    }}
+                                  >
+                                    <input
+                                      id={`ch-${it.source_id}`}
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() => toggleChannel(it.source_id)}
+                                      style={{ accentColor: '#1a7f5a', width: '16px', height: '16px', cursor: 'pointer', flexShrink: 0 }}
+                                    />
+                                    <div>
+                                      <Text as="p" variant="bodyMd" fontWeight={checked ? 'semibold' : 'regular'}>
+                                        {it.name || it.source_id}
+                                      </Text>
+                                      <Text as="p" variant="bodySm" tone="subdued">
+                                        Country: {it.default_country} · Locale: {it.default_locale} · {it.domains} domain{it.domains !== 1 ? 's' : ''}
+                                      </Text>
+                                    </div>
+                                    <Text as="span" variant="bodySm" tone="subdued">
+                                      <code style={{ fontSize: '12px', background: 'var(--p-color-bg-surface-secondary)', padding: '2px 6px', borderRadius: '4px' }}>
+                                        {it.proposed_subfolder}
+                                      </code>
+                                    </Text>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                })()}
               </div>
 
               {noneSelected && (

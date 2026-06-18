@@ -19,8 +19,8 @@ class MagentoClient
         if (!str_contains($baseUrl, '/rest')) {
             $baseUrl .= '/rest';
         }
-        // Ensure endpoint starts with /V1/
-        if (!str_starts_with($endpoint, '/V1/')) {
+        // Ensure endpoint starts with /V1/ or /{store_code}/V1/
+        if (!str_starts_with($endpoint, '/V1/') && !preg_match('#^/[a-zA-Z0-9_-]+/V1/#', $endpoint)) {
             $endpoint = '/V1/' . ltrim($endpoint, '/');
         }
 
@@ -115,11 +115,39 @@ class MagentoClient
                 $configs = $this->request($conn, 'GET', '/store/storeConfigs');
                 // Get list of store views
                 $stores = $this->request($conn, 'GET', '/store/storeViews');
+                // Get websites
+                $websites = [];
+                try {
+                    $websites = $this->request($conn, 'GET', '/store/websites') ?: [];
+                } catch (\Throwable $e) {
+                    // Ignore website fetch error
+                }
+                // Get store groups
+                $groups = [];
+                try {
+                    $groups = $this->request($conn, 'GET', '/store/storeGroups') ?: [];
+                } catch (\Throwable $e) {
+                    // Ignore group fetch error
+                }
+
+                $websiteMap = [];
+                foreach ($websites as $w) {
+                    if (isset($w['id'])) {
+                        $websiteMap[(int)$w['id']] = $w['name'] ?? '';
+                    }
+                }
+
+                $groupMap = [];
+                foreach ($groups as $g) {
+                    if (isset($g['id'])) {
+                        $groupMap[(int)$g['id']] = $g['name'] ?? '';
+                    }
+                }
 
                 $out = [];
                 foreach ($stores as $store) {
                     $code = $store['code'] ?? '';
-                    if ($code === '') {
+                    if ($code === '' || $code === 'admin') {
                         continue;
                     }
 
@@ -136,13 +164,19 @@ class MagentoClient
                         }
                     }
 
+                    $wId = isset($store['website_id']) ? (int)$store['website_id'] : 0;
+                    $gId = isset($store['store_group_id']) ? (int)$store['store_group_id'] : 0;
+
                     $out[] = [
                         'id' => (string) ($store['id'] ?? ''),
                         'code' => $code,
                         'name' => $store['name'] ?? $code,
                         'locale' => str_replace('_', '-', $locale),
                         'currency' => $currency,
-                        'website_id' => (string) ($store['website_id'] ?? ''),
+                        'website_id' => (string) $wId,
+                        'website_name' => $websiteMap[$wId] ?? '',
+                        'store_group_id' => (string) $gId,
+                        'store_group_name' => $groupMap[$gId] ?? '',
                     ];
                 }
                 return $out;

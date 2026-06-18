@@ -2,7 +2,7 @@
 
 client_id = "d9aa4e299ccb21484413b932e76fc9e5"
 name = "ICTECHM2SMigrator"
-application_url = "https://protection-simple-respondent-emperor.trycloudflare.com"
+application_url = "https://loaded-members-interact-recognize.trycloudflare.com"
 embedded = true
 
 [build]
@@ -20,5 +20,5 @@ scopes = "read_products,write_products,read_inventory,write_inventory,read_locat
 
 [auth]
 redirect_urls = [
-  "https://protection-simple-respondent-emperor.trycloudflare.com/auth/shopify/callback"
+  "https://loaded-members-interact-recognize.trycloudflare.com/auth/shopify/callback"
 ]

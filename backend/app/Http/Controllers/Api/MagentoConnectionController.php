@@ -125,12 +125,32 @@ class MagentoConnectionController extends Controller
             $magento = app(MagentoClient::class);
             $storeViews = $magento->getStoreViews($conn);
 
-            $languages = [];
+            // Determine primary/default locale
+            $defaultCode = $conn->store_view_code ?: 'default';
+            $defaultLocale = 'en-US';
             foreach ($storeViews as $sv) {
+                if ($sv['code'] === $defaultCode) {
+                    $defaultLocale = $sv['locale'];
+                    break;
+                }
+            }
+
+            $languages = [];
+            $seenLocales = [$defaultLocale => true];
+
+            foreach ($storeViews as $sv) {
+                $locale = $sv['locale'];
+                if (isset($seenLocales[$locale])) {
+                    continue;
+                }
+                $seenLocales[$locale] = true;
+
+                $langName = $this->getLanguageNameFromLocale($locale);
+
                 $languages[] = [
-                    'id'     => $sv['id'],
-                    'name'   => $sv['name'] . ' (' . $sv['locale'] . ')',
-                    'locale' => $sv['locale'],
+                    'id'     => $locale,
+                    'name'   => $langName . ' (' . $locale . ')',
+                    'locale' => $locale,
                 ];
             }
 
@@ -141,6 +161,28 @@ class MagentoConnectionController extends Controller
                 'languages' => [],
             ], 500);
         }
+    }
+
+    private function getLanguageNameFromLocale(string $locale): string
+    {
+        $parts = explode('-', $locale);
+        $langCode = strtolower($parts[0]);
+
+        $names = [
+            'en' => 'English',
+            'fr' => 'French',
+            'de' => 'German',
+            'es' => 'Spanish',
+            'it' => 'Italian',
+            'nl' => 'Dutch',
+            'pt' => 'Portuguese',
+            'ru' => 'Russian',
+            'zh' => 'Chinese',
+            'ja' => 'Japanese',
+            'ko' => 'Korean',
+        ];
+
+        return $names[$langCode] ?? ucfirst($langCode);
     }
 
     /**

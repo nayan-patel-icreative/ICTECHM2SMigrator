@@ -134,6 +134,11 @@ class ShopifyTranslationSyncService
                     'shop_locales' => $shopLocalesInfo,
                 ]);
                 $result['translation_api_errors'] = $transResult;
+            } else {
+                Log::info('ShopifyTranslationSyncService: translationsRegister success', [
+                    'resource_gid' => $resourceGid,
+                    'translation_inputs' => $translationInputs,
+                ]);
             }
         } catch (\Throwable $e) {
             Log::warning('ShopifyTranslationSyncService: translationsRegister exception (non-fatal)', [

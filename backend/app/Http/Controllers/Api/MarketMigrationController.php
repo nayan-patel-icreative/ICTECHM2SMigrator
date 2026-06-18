@@ -60,6 +60,8 @@ class MarketMigrationController extends Controller
                 'countries' => 1,
                 'domains' => 1,
                 'proposed_subfolder' => '/' . $extractedSuffix,
+                'website_name' => $c['website_name'] ?? '',
+                'store_group_name' => $c['store_group_name'] ?? '',
             ];
         }
 

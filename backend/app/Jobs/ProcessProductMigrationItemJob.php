@@ -109,6 +109,14 @@ class ProcessProductMigrationItemJob implements ShouldQueue
         $priceListSync    = app(ShopifyPriceListSyncService::class);
         $translationSync = app(ShopifyTranslationSyncService::class);
 
+        $enabledLanguages = [];
+        if ($conn && is_array($conn->language_config)) {
+            foreach ($conn->language_config as $lang) {
+                if (!empty($lang['enabled'])) {
+                    $enabledLanguages[] = $lang;
+                }
+            }
+        }
 
         $t0 = microtime(true);
         $tShopwareParent = 0.0;
@@ -142,6 +150,233 @@ class ProcessProductMigrationItemJob implements ShouldQueue
                 $children = [];
             }
 
+            // Extract category IDs early for fingerprinting and migration
+            $categoryIds = [];
+            $categoryLinks = data_get($parent, 'extension_attributes.category_links', []);
+            if (is_array($categoryLinks)) {
+                foreach ($categoryLinks as $link) {
+                    $cid = data_get($link, 'category_id');
+                    if ($cid) {
+                        $categoryIds[] = (string) $cid;
+                    }
+                }
+            }
+            if (count($categoryIds) === 0) {
+                $attrs = data_get($parent, 'custom_attributes', []);
+                if (is_array($attrs)) {
+                    foreach ($attrs as $attr) {
+                        if (data_get($attr, 'attribute_code') === 'category_ids') {
+                            $val = data_get($attr, 'value');
+                            if (is_array($val)) {
+                                foreach ($val as $v) {
+                                    $categoryIds[] = (string) $v;
+                                }
+                            } elseif (is_string($val) || is_numeric($val)) {
+                                $categoryIds[] = (string) $val;
+                            }
+                        }
+                    }
+                }
+            }
+            $categoryIds = array_unique($categoryIds);
+
+            // Fetch product and category translations dynamically from Magento for fingerprinting and translation syncing
+            $translationsByLocale = [];
+            $categoryTranslationsForFp = [];
+            if (count($enabledLanguages) > 0) {
+                try {
+                    $storeViews = $magento->getStoreViews($conn);
+                    foreach ($enabledLanguages as $lang) {
+                        $targetLocale = $lang['locale'];
+                        $matchedCode = null;
+                        foreach ($storeViews as $sv) {
+                            if (strtolower($sv['locale']) === strtolower($targetLocale)) {
+                                $matchedCode = $sv['code'];
+                                break;
+                            }
+                        }
+
+                        if (!$matchedCode) {
+                            continue;
+                        }
+
+                        // Fetch localized product
+                        $localizedEndpoint = '/' . $matchedCode . '/V1/products/' . urlencode($parent['sku']);
+                        $localizedProduct = $magento->request($conn, 'GET', $localizedEndpoint);
+
+                        if (is_array($localizedProduct)) {
+                            $fields = [];
+                            $name = trim((string) ($localizedProduct['name'] ?? ''));
+                            if ($name !== '' && $name !== trim((string) ($parent['name'] ?? ''))) {
+                                $fields['name'] = $name;
+                            }
+
+                            $desc = '';
+                            $customAttrs = $localizedProduct['custom_attributes'] ?? [];
+                            if (is_array($customAttrs)) {
+                                foreach ($customAttrs as $attr) {
+                                    if (($attr['attribute_code'] ?? '') === 'description') {
+                                        $desc = trim((string) ($attr['value'] ?? ''));
+                                        break;
+                                    }
+                                }
+                            }
+
+                            $parentDesc = '';
+                            $parentCustomAttrs = $parent['custom_attributes'] ?? [];
+                            if (is_array($parentCustomAttrs)) {
+                                foreach ($parentCustomAttrs as $attr) {
+                                    if (($attr['attribute_code'] ?? '') === 'description') {
+                                        $parentDesc = trim((string) ($attr['value'] ?? ''));
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if ($desc !== '' && $desc !== $parentDesc) {
+                                $fields['description'] = $desc;
+                            }
+
+                            $metaTitle = '';
+                            $metaDescription = '';
+                            foreach ($customAttrs as $attr) {
+                                if (($attr['attribute_code'] ?? '') === 'meta_title') {
+                                    $metaTitle = trim((string) ($attr['value'] ?? ''));
+                                }
+                                if (($attr['attribute_code'] ?? '') === 'meta_description') {
+                                    $metaDescription = trim((string) ($attr['value'] ?? ''));
+                                }
+                            }
+
+                            $parentMetaTitle = '';
+                            $parentMetaDescription = '';
+                            foreach ($parentCustomAttrs as $attr) {
+                                if (($attr['attribute_code'] ?? '') === 'meta_title') {
+                                    $parentMetaTitle = trim((string) ($attr['value'] ?? ''));
+                                }
+                                if (($attr['attribute_code'] ?? '') === 'meta_description') {
+                                    $parentMetaDescription = trim((string) ($attr['value'] ?? ''));
+                                }
+                            }
+
+                            if ($metaTitle !== '' && $metaTitle !== $parentMetaTitle) {
+                                $fields['metaTitle'] = $metaTitle;
+                            }
+                            if ($metaDescription !== '' && $metaDescription !== $parentMetaDescription) {
+                                $fields['metaDescription'] = $metaDescription;
+                            }
+
+                            if (!empty($fields)) {
+                                $translationsByLocale[$targetLocale] = $fields;
+                            }
+                        }
+                    }
+
+                    // Fetch localized category translations for the product's categories
+                    foreach ($categoryIds as $cid) {
+                        if ($cid === '1' || $cid === '2') {
+                            continue;
+                        }
+
+                        $cacheKey = "magento:category:{$conn->id}:{$cid}";
+                        $catData = \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addDays(1), function () use ($magento, $conn, $cid) {
+                            return $magento->getCategory($conn, (int) $cid);
+                        });
+
+                        if (!$catData || empty($catData['name'])) {
+                            continue;
+                        }
+
+                        foreach ($enabledLanguages as $lang) {
+                            $targetLocale = $lang['locale'];
+                            $matchedCode = null;
+                            foreach ($storeViews as $sv) {
+                                if (strtolower($sv['locale']) === strtolower($targetLocale)) {
+                                    $matchedCode = $sv['code'];
+                                    break;
+                                }
+                            }
+
+                            if (!$matchedCode) {
+                                continue;
+                            }
+
+                            $localizedCatEndpoint = '/' . $matchedCode . '/V1/categories/' . $cid;
+                            $localizedCat = $magento->request($conn, 'GET', $localizedCatEndpoint);
+
+                            if (is_array($localizedCat)) {
+                                $fields = [];
+                                $name = trim((string) ($localizedCat['name'] ?? ''));
+                                if ($name !== '' && $name !== trim((string) ($catData['name'] ?? ''))) {
+                                    $fields['name'] = $name;
+                                }
+
+                                $desc = '';
+                                $customAttrs = $localizedCat['custom_attributes'] ?? [];
+                                if (is_array($customAttrs)) {
+                                    foreach ($customAttrs as $attr) {
+                                        if (($attr['attribute_code'] ?? '') === 'description') {
+                                            $desc = trim((string) ($attr['value'] ?? ''));
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                $parentDesc = '';
+                                $parentCustomAttrs = $catData['custom_attributes'] ?? [];
+                                if (is_array($parentCustomAttrs)) {
+                                    foreach ($parentCustomAttrs as $attr) {
+                                        if (($attr['attribute_code'] ?? '') === 'description') {
+                                            $parentDesc = trim((string) ($attr['value'] ?? ''));
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if ($desc !== '' && $desc !== $parentDesc) {
+                                    $fields['description'] = $desc;
+                                }
+
+                                $metaTitle = '';
+                                $metaDescription = '';
+                                foreach ($customAttrs as $attr) {
+                                    if (($attr['attribute_code'] ?? '') === 'meta_title') {
+                                        $metaTitle = trim((string) ($attr['value'] ?? ''));
+                                    }
+                                    if (($attr['attribute_code'] ?? '') === 'meta_description') {
+                                        $metaDescription = trim((string) ($attr['value'] ?? ''));
+                                    }
+                                }
+
+                                $parentMetaTitle = '';
+                                $parentMetaDescription = '';
+                                foreach ($parentCustomAttrs as $attr) {
+                                    if (($attr['attribute_code'] ?? '') === 'meta_title') {
+                                        $parentMetaTitle = trim((string) ($attr['value'] ?? ''));
+                                    }
+                                    if (($attr['attribute_code'] ?? '') === 'meta_description') {
+                                        $parentMetaDescription = trim((string) ($attr['value'] ?? ''));
+                                    }
+                                }
+
+                                if ($metaTitle !== '' && $metaTitle !== $parentMetaTitle) {
+                                    $fields['metaTitle'] = $metaTitle;
+                                }
+                                if ($metaDescription !== '' && $metaDescription !== $parentMetaDescription) {
+                                    $fields['metaDescription'] = $metaDescription;
+                                }
+
+                                if (!empty($fields)) {
+                                    $categoryTranslationsForFp[$cid][$targetLocale] = $fields;
+                                }
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to pre-fetch product and category translations for fingerprinting', ['error' => $e->getMessage()]);
+                }
+            }
+
             $priceMode = is_string($shop->price_mode) && $shop->price_mode !== '' ? $shop->price_mode : 'gross';
 
             if (count($children) > 100) {
@@ -155,7 +390,12 @@ class ProcessProductMigrationItemJob implements ShouldQueue
             $tStep = microtime(true);
             $payload = $mapper->mapParentWithVariants($parent, $children, (string) $run->shopify_location_gid, $shop->id, $priceMode);
             $metafieldsForFp = $mapper->mapShopwareMetafields($parent, $children, $shop, $priceMode);
-            $fp = $fingerprints->make(array_merge($payload, ['metafields' => $metafieldsForFp]));
+            $fp = $fingerprints->make(array_merge($payload, [
+                'metafields' => $metafieldsForFp,
+                'translations' => $translationsByLocale,
+                'category_translations' => $categoryTranslationsForFp,
+                'enabled_languages' => $enabledLanguages
+            ]));
             $tMap += (microtime(true) - $tStep);
 
             $variantCountForReport = count(is_array($children) ? $children : []);
@@ -391,20 +631,15 @@ class ProcessProductMigrationItemJob implements ShouldQueue
             }
 
             // --- Translation sync (non-blocking) ---
-            // Translations are embedded in the already-fetched $parent data (no extra Shopware API call).
-            // Errors here are logged as warnings and stored in error_context but never fail the item.
-            $enabledLanguages = [];
+            // Sync pre-fetched localized details for each enabled language to Shopify.
             try {
-                if (count($enabledLanguages) > 0) {
-                    $translationsByLocale = ShopifyTranslationSyncService::extractTranslationsFromEntity($parent, $enabledLanguages);
-                    if (count($translationsByLocale) > 0) {
-                        $transRes = $translationSync->syncTranslations($shop, $productGid, $translationsByLocale);
-                        if (!empty($transRes['translation_api_errors']) || !empty($transRes['metafield_errors'])) {
-                            $ctx = is_array($item->error_context) ? $item->error_context : [];
-                            $ctx['translation_sync'] = $transRes;
-                            $item->error_context = $ctx;
-                            $item->save();
-                        }
+                if (count($translationsByLocale) > 0) {
+                    $transRes = $translationSync->syncTranslations($shop, $productGid, $translationsByLocale);
+                    if (!empty($transRes['translation_api_errors']) || !empty($transRes['metafield_errors'])) {
+                        $ctx = is_array($item->error_context) ? $item->error_context : [];
+                        $ctx['translation_sync'] = $transRes;
+                        $item->error_context = $ctx;
+                        $item->save();
                     }
                 }
             } catch (\Throwable $translationException) {
@@ -608,35 +843,6 @@ class ProcessProductMigrationItemJob implements ShouldQueue
             }
             $tMedia += (microtime(true) - $tStep);
 
-            $categoryIds = [];
-            $categoryLinks = data_get($parent, 'extension_attributes.category_links', []);
-            if (is_array($categoryLinks)) {
-                foreach ($categoryLinks as $link) {
-                    $cid = data_get($link, 'category_id');
-                    if ($cid) {
-                        $categoryIds[] = (string) $cid;
-                    }
-                }
-            }
-            if (count($categoryIds) === 0) {
-                $attrs = data_get($parent, 'custom_attributes', []);
-                if (is_array($attrs)) {
-                    foreach ($attrs as $attr) {
-                        if (data_get($attr, 'attribute_code') === 'category_ids') {
-                            $val = data_get($attr, 'value');
-                            if (is_array($val)) {
-                                foreach ($val as $v) {
-                                    $categoryIds[] = (string) $v;
-                                }
-                            } elseif (is_string($val) || is_numeric($val)) {
-                                $categoryIds[] = (string) $val;
-                            }
-                        }
-                    }
-                }
-            }
-            $categoryIds = array_unique($categoryIds);
-
             if (count($categoryIds) > 0) {
                 foreach ($categoryIds as $cid) {
                     $tCatStart = microtime(true);
@@ -692,6 +898,20 @@ class ProcessProductMigrationItemJob implements ShouldQueue
                     $title = (string) data_get($catPayload, 'name', 'Category');
                     $colRes = $collectionSync->upsertCollectionForCategoryAndAddProduct($shop, $cid, $catPayload, $productGid, $enabledLanguages);
                     $tCollections += (microtime(true) - $tCatStart);
+
+                    // --- Magento Category/Collection Translation sync (non-blocking) ---
+                    $categoryTranslations = $categoryTranslationsForFp[$cid] ?? [];
+                    if (count($categoryTranslations) > 0 && isset($colRes['collectionGid']) && $colRes['collectionGid'] !== '') {
+                        try {
+                            $translationSync->syncCollectionTranslations($shop, $colRes['collectionGid'], $categoryTranslations);
+                        } catch (\Throwable $e) {
+                            Log::warning('Category translation sync failed', [
+                                'category_id' => $cid,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
+
                     if (! empty($colRes['errors']) || (! empty($colRes['userErrors']) && is_array($colRes['userErrors']))) {
                         $ctx = is_array($item->error_context) ? $item->error_context : [];
                         $ctx['collection_sync'] = $ctx['collection_sync'] ?? [];

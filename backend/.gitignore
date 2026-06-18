@@ -21,3 +21,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+/storage/logs/laravel.log
+/storage/logs/queue-worker.log
+/storage/logs/tunnel.log

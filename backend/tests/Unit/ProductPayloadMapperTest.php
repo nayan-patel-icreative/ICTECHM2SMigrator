@@ -59,18 +59,18 @@ class ProductPayloadMapperTest extends TestCase
         ], []);
 
         $keys = array_column($fields, 'key');
-        $this->assertContains('product_id', $keys);
-        $this->assertContains('sku', $keys);
-        $this->assertContains('weight', $keys);
+        $this->assertContains('custom_id', $keys);
+        $this->assertContains('product_number', $keys);
+        $this->assertContains('weight_kg', $keys);
 
         $byKey = [];
         foreach ($fields as $field) {
             $byKey[$field['key']] = $field['value'];
         }
 
-        $this->assertSame('123', $byKey['product_id']);
-        $this->assertSame('PN-1', $byKey['sku']);
-        $this->assertSame('2.5', $byKey['weight']);
+        $this->assertSame('123', $byKey['custom_id']);
+        $this->assertSame('PN-1', $byKey['product_number']);
+        $this->assertSame('2.5', $byKey['weight_kg']);
     }
 
     public function test_maps_handle_from_url_key(): void
@@ -90,5 +90,45 @@ class ProductPayloadMapperTest extends TestCase
         $this->assertSame('main-product-url-key', $payload['handle']);
         $this->assertSame('SEO Title', $payload['seo']['title']);
         $this->assertSame('SEO Description', $payload['seo']['description']);
+    }
+
+    public function test_digital_product_requires_shipping_is_false(): void
+    {
+        $mapper = new ProductPayloadMapper();
+
+        // Downloadable product (digital)
+        $payloadDownloadable = $mapper->mapParentWithVariants([
+            'name' => 'Digital E-Book',
+            'sku' => 'BOOK-DIGITAL',
+            'price' => 5.00,
+            'type_id' => 'downloadable',
+        ], [], 'gid://shopify/Location/1');
+
+        $this->assertFalse($payloadDownloadable['variants'][0]['inventoryItem']['requiresShipping']);
+
+        // Virtual product (digital)
+        $payloadVirtual = $mapper->mapParentWithVariants([
+            'name' => 'SaaS Membership',
+            'sku' => 'SAAS-SUB',
+            'price' => 29.00,
+            'type_id' => 'virtual',
+        ], [], 'gid://shopify/Location/1');
+
+        $this->assertFalse($payloadVirtual['variants'][0]['inventoryItem']['requiresShipping']);
+    }
+
+    public function test_physical_product_requires_shipping_is_true(): void
+    {
+        $mapper = new ProductPayloadMapper();
+
+        // Simple product (physical)
+        $payloadSimple = $mapper->mapParentWithVariants([
+            'name' => 'Physical Mug',
+            'sku' => 'MUG-PHYSICAL',
+            'price' => 12.00,
+            'type_id' => 'simple',
+        ], [], 'gid://shopify/Location/1');
+
+        $this->assertTrue($payloadSimple['variants'][0]['inventoryItem']['requiresShipping']);
     }
 }

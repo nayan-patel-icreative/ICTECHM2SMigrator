@@ -233,6 +233,9 @@ class ProductPayloadMapper
             ];
         }
 
+        $typeId = (string) ($variant['type_id'] ?? $fallbackParent['type_id'] ?? '');
+        $isDigital = ($typeId === 'virtual' || $typeId === 'downloadable');
+
         $payload = [
             'price' => $price,
             'sku' => $this->normalizeText($variant['sku'] ?? ''),
@@ -246,6 +249,9 @@ class ProductPayloadMapper
                     'name' => 'available',
                     'quantity' => $inventoryQty,
                 ],
+            ],
+            'inventoryItem' => [
+                'requiresShipping' => !$isDigital,
             ],
         ];
 

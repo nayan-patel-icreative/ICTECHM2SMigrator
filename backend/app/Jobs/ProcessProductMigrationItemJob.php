@@ -41,7 +41,7 @@ class ProcessProductMigrationItemJob implements ShouldQueue
     private string $sourceId;
 
     /**
-     * SAFE CHANGE: This job processes exactly one Shopware parent product ID.
+     * SAFE CHANGE: This job processes exactly one Magento parent product ID.
      * It is idempotent via:
      * - migration_items unique key (run+entity+source)
      * - Shopify productSet customId upsert
@@ -119,8 +119,8 @@ class ProcessProductMigrationItemJob implements ShouldQueue
         }
 
         $t0 = microtime(true);
-        $tShopwareParent = 0.0;
-        $tShopwareChildren = 0.0;
+        $tMagentoParent = 0.0;
+        $tMagentoChildren = 0.0;
         $tMap = 0.0;
         $tShopifyUpsert = 0.0;
         $tMedia = 0.0;
@@ -138,7 +138,7 @@ class ProcessProductMigrationItemJob implements ShouldQueue
             $result = $magento->fetchProductWithChildren($conn, $sourceId);
             $parent = $result['parent'] ?? null;
             $children = $result['children'] ?? [];
-            $tShopwareParent += (microtime(true) - $tStep);
+            $tMagentoParent += (microtime(true) - $tStep);
 
             if (! is_array($parent) || empty($parent['id'])) {
                 $this->markFailed($run, $item, 'Magento product not found', ['source_id' => $sourceId]);
@@ -389,7 +389,7 @@ class ProcessProductMigrationItemJob implements ShouldQueue
 
             $tStep = microtime(true);
             $payload = $mapper->mapParentWithVariants($parent, $children, (string) $run->shopify_location_gid, $shop->id, $priceMode);
-            $metafieldsForFp = $mapper->mapShopwareMetafields($parent, $children, $shop, $priceMode);
+            $metafieldsForFp = $mapper->mapMagentoMetafields($parent, $children, $shop, $priceMode);
             $fp = $fingerprints->make(array_merge($payload, [
                 'metafields' => $metafieldsForFp,
                 'translations' => $translationsByLocale,
@@ -420,7 +420,7 @@ class ProcessProductMigrationItemJob implements ShouldQueue
                             $ctx['publication_sync'] = $pubRes;
                         }
 
-                        // Sync product visibility across specific market publications based on Shopware visibilities
+                        // Sync product visibility across specific market publications based on Magento store view visibilities
                         $visibilities = data_get($parent, 'visibilities', []);
                         if (is_array($visibilities)) {
                             $marketPubRes = $publication->syncProductToMarkets($shop, $mapping->shopify_gid, $visibilities);
@@ -526,7 +526,7 @@ class ProcessProductMigrationItemJob implements ShouldQueue
                 $item->error_context = $ctx;
             }
 
-            // Sync product visibility across specific market publications based on Shopware visibilities
+            // Sync product visibility across specific market publications based on Magento store view visibilities
             $visibilities = data_get($parent, 'visibilities', []);
             if (is_array($visibilities)) {
                 $marketPubRes = $publication->syncProductToMarkets($shop, $productGid, $visibilities);
@@ -546,16 +546,16 @@ class ProcessProductMigrationItemJob implements ShouldQueue
                 }
             }
 
-            // Sync prices to the Shopware currency price list (same mechanism as orderCreate currency)
-            $variantIdByShopwareId = $upsert['variantIdByShopwareId'] ?? [];
-            $variantIdByShopwareId = is_array($variantIdByShopwareId) ? $variantIdByShopwareId : [];
+            // Sync prices to the Magento currency price list (same mechanism as orderCreate currency)
+            $variantIdByMagentoId = $upsert['variantIdByMagentoId'] ?? [];
+            $variantIdByMagentoId = is_array($variantIdByMagentoId) ? $variantIdByMagentoId : [];
             $allVariantGids = $upsert['allVariantGids'] ?? [];
             $allVariantGids = is_array($allVariantGids) ? $allVariantGids : [];
 
-            if (count($variantIdByShopwareId) > 0 || count($allVariantGids) > 0) {
+            if (count($variantIdByMagentoId) > 0 || count($allVariantGids) > 0) {
                 $tStep = microtime(true);
                 $priceData = $mapper->extractVariantPricesForPriceList(
-                    $variantIdByShopwareId,
+                    $variantIdByMagentoId,
                     $parent,
                     $children,
                     $shop,
@@ -589,7 +589,7 @@ class ProcessProductMigrationItemJob implements ShouldQueue
                         $advMapper = app(AdvancedPriceMapper::class);
                         $grouped = $advMapper->map(
                             $advancedPrices,
-                            $variantIdByShopwareId,
+                            $variantIdByMagentoId,
                             $allVariantGids,
                             $priceData['currency'],
                             $priceMode
@@ -617,7 +617,7 @@ class ProcessProductMigrationItemJob implements ShouldQueue
                 $tShopifyUpsert += (microtime(true) - $tStep);
             }
 
-            $metafields = $mapper->mapShopwareMetafields($parent, $children, $shop, $priceMode);
+            $metafields = $mapper->mapMagentoMetafields($parent, $children, $shop, $priceMode);
             if (count($metafields) > 0) {
                 $tStep = microtime(true);
                 $mfRes = $sync->setProductMetafields($shop, $productGid, $metafields);
@@ -652,10 +652,10 @@ class ProcessProductMigrationItemJob implements ShouldQueue
             }
 
             // --- Digital file CDN upload (non-blocking) ---
-            // Upload Shopware private digital download files to Shopify Files CDN
+            // Upload Magento private digital download files to Shopify Files CDN
             // and update product/variant metafields with the resulting CDN URLs.
             //
-            // Private Shopware files (media.private=true, media.url="") are read
+            // Private Magento files (media.private=true, media.url="") are read
             // directly from disk using the connection's files_path (Strategy 2 in
             // ShopifyDigitalFileSyncService). Public files use their URL (Strategy 1).
             //
@@ -666,7 +666,7 @@ class ProcessProductMigrationItemJob implements ShouldQueue
             // If CDN upload fails, the metafield is left empty (not written).
             try {
                 $digitalFiles = $mapper->extractDigitalDownloadFiles($parent);
-                // Collect variant-level digital files keyed by Shopware variant ID
+                // Collect variant-level digital files keyed by Magento variant ID
                 $variantDigitalFiles = [];
                 foreach ($children as $child) {
                     if (!is_array($child)) continue;
@@ -679,9 +679,9 @@ class ProcessProductMigrationItemJob implements ShouldQueue
                 $hasDigitalFiles = count($digitalFiles) > 0 || count($variantDigitalFiles) > 0;
                 if ($hasDigitalFiles) {
                     $digitalSync      = app(\App\Services\Migration\ShopifyDigitalFileSyncService::class);
-                    $shopwareToken    = $conn->access_token;
-                    $shopwareBaseUrl  = (string) $conn->api_url;
-                    $shopwareFilesPath = trim((string) ($conn->files_path ?? ''));
+                    $magentoToken    = $conn->access_token;
+                    $magentoBaseUrl  = (string) $conn->api_url;
+                    $magentoFilesPath = trim((string) ($conn->files_path ?? ''));
 
                     $allProductLinks = [];
 
@@ -689,7 +689,7 @@ class ProcessProductMigrationItemJob implements ShouldQueue
                     if (count($digitalFiles) > 0) {
                         $sync->ensureDigitalFileMetafieldDefinitions($shop, count($digitalFiles));
                         $uploaded = $digitalSync->uploadDigitalFiles(
-                            $shop, $digitalFiles, $shopwareBaseUrl, $shopwareToken, $shopwareFilesPath
+                            $shop, $digitalFiles, $magentoBaseUrl, $magentoToken, $magentoFilesPath
                         );
 
                         foreach ($uploaded as $result) {
@@ -704,28 +704,28 @@ class ProcessProductMigrationItemJob implements ShouldQueue
                     }
 
                     // ── Variant-level digital files ──────────────────────────────────────
-                    if (count($variantDigitalFiles) > 0 && count($variantIdByShopwareId) > 0) {
+                    if (count($variantDigitalFiles) > 0 && count($variantIdByMagentoId) > 0) {
                         $maxVariantFileCount = max(array_map('count', $variantDigitalFiles));
                         $sync->ensureVariantDigitalFileMetafieldDefinitions($shop, $maxVariantFileCount);
 
-                        foreach ($variantDigitalFiles as $swVariantId => $variantFiles) {
-                            if ($swVariantId === '' || count($variantFiles) === 0) {
+                        foreach ($variantDigitalFiles as $magentoVariantId => $variantFiles) {
+                            if ($magentoVariantId === '' || count($variantFiles) === 0) {
                                 continue;
                             }
 
                             // Only proceed for variants successfully migrated to Shopify
-                            $shopifyVariantGid = $variantIdByShopwareId[$swVariantId] ?? null;
+                            $shopifyVariantGid = $variantIdByMagentoId[$magentoVariantId] ?? null;
                             if (!is_string($shopifyVariantGid) || $shopifyVariantGid === '') {
-                                Log::warning('Variant digital files: no Shopify GID for Shopware variant', [
+                                Log::warning('Variant digital files: no Shopify GID for Magento variant', [
                                     'run_id'        => $run->id,
                                     'shop'          => $shop->shop_domain,
-                                    'sw_variant_id' => $swVariantId,
+                                    'magento_variant_id' => $magentoVariantId,
                                 ]);
                                 continue;
                             }
 
                             $variantUploaded = $digitalSync->uploadDigitalFiles(
-                                $shop, $variantFiles, $shopwareBaseUrl, $shopwareToken, $shopwareFilesPath
+                                $shop, $variantFiles, $magentoBaseUrl, $magentoToken, $magentoFilesPath
                             );
 
                             $links = [];
@@ -814,11 +814,11 @@ class ProcessProductMigrationItemJob implements ShouldQueue
 
             // Media + collections (media failures must not fail the product — productSet already succeeded)
             $tStep = microtime(true);
-            $variantIdByShopwareIdForMedia = is_array($variantIdByShopwareId) && count($variantIdByShopwareId) > 0
-                ? $variantIdByShopwareId
+            $variantIdByMagentoIdForMedia = is_array($variantIdByMagentoId) && count($variantIdByMagentoId) > 0
+                ? $variantIdByMagentoId
                 : null;
             try {
-                $mediaRes = $mediaSync->syncProductAndVariantImages($shop, $productGid, (string) $conn->api_url, $parent, $children, $variantIdByShopwareIdForMedia);
+                $mediaRes = $mediaSync->syncProductAndVariantImages($shop, $productGid, (string) $conn->api_url, $parent, $children, $variantIdByMagentoIdForMedia);
                 if (! empty($mediaRes['errors']) || (! empty($mediaRes['userErrors']) && is_array($mediaRes['userErrors']))) {
                     $ctx = is_array($item->error_context) ? $item->error_context : [];
                     $ctx['media_sync'] = $mediaRes;
@@ -956,8 +956,8 @@ class ProcessProductMigrationItemJob implements ShouldQueue
                 'source_id' => $sourceId,
                 'shopify_gid' => $productGid,
                 'sec_total' => round($totalSec, 3),
-                'sec_shopware_parent' => round($tShopwareParent, 3),
-                'sec_shopware_children' => round($tShopwareChildren, 3),
+                'sec_magento_parent' => round($tMagentoParent, 3),
+                'sec_magento_children' => round($tMagentoChildren, 3),
                 'sec_map' => round($tMap, 3),
                 'sec_shopify_upsert' => round($tShopifyUpsert, 3),
                 'sec_media' => round($tMedia, 3),

@@ -101,30 +101,29 @@ GQL;
     /**
      * @return array{created: int, appended: int, errors?: mixed, userErrors?: array<int, mixed>}
      */
-    public function syncProductAndVariantImages(Shop $shop, string $productGid, string $shopwareBaseUrl, array $parent, array $children, ?array $variantIdByShopwareId = null): array
+    public function syncProductAndVariantImages(Shop $shop, string $productGid, string $magentoBaseUrl, array $parent, array $children, ?array $variantIdByMagentoId = null): array
     {
         \Illuminate\Support\Facades\Log::info('Starting media sync', [
             'shop' => $shop->shop_domain,
             'product_gid' => $productGid,
-            'sw_id' => $parent['id'] ?? 'unknown'
+            'magento_id' => $parent['id'] ?? 'unknown'
         ]);
 
-        if (count($children) > 0 && ($variantIdByShopwareId === null || count($variantIdByShopwareId) === 0)) {
+        if (count($children) > 0 && ($variantIdByMagentoId === null || count($variantIdByMagentoId) === 0)) {
             $variantMap = $this->fetchShopifyVariantMap($shop, $productGid);
             if (isset($variantMap['errors'])) {
                 return ['created' => 0, 'appended' => 0, 'errors' => $variantMap['errors']];
             }
 
-            /** @var array<string, string> $variantIdByShopwareId */
-            $variantIdByShopwareId = $variantMap['variantIdByShopwareId'] ?? [];
+            /** @var array<string, string> $variantIdByMagentoId */
+            $variantIdByMagentoId = $variantMap['variantIdByMagentoId'] ?? [];
         }
 
-        $shopwareBaseUrl = rtrim($shopwareBaseUrl, '/');
-        $productUrls = $this->collectProductImageUrls($shopwareBaseUrl, $parent);
+        $magentoBaseUrl = rtrim($magentoBaseUrl, '/');
+        $productUrls = $this->collectProductImageUrls($magentoBaseUrl, $parent);
 
         // Collect variant images: map of variantId => [imageUrls...]
-        // Pass parent for configuratorSettings option-image mapping
-        $variantImagesByShopwareId = $this->collectVariantImageUrls($shopwareBaseUrl, $children, $parent);
+        $variantImagesByMagentoId = $this->collectVariantImageUrls($magentoBaseUrl, $children, $parent);
 
         // Collect ALL variant image URLs (not just first per variant)
         $allUrls = [];
@@ -132,7 +131,7 @@ GQL;
             $allUrls[$u] = true;
         }
         // Add ALL variant images, not just one per variant
-        foreach ($variantImagesByShopwareId as $swVariantId => $imageUrls) {
+        foreach ($variantImagesByMagentoId as $magentoVariantId => $imageUrls) {
             foreach ($imageUrls as $u) {
                 $allUrls[$u] = true;
             }
@@ -184,8 +183,8 @@ GQL;
         $appendPairs = [];
         $mediaIdsByVariant = [];
 
-        foreach ($variantImagesByShopwareId as $swVariantId => $imageUrls) {
-            $shopifyVariantId = $variantIdByShopwareId[$swVariantId] ?? null;
+        foreach ($variantImagesByMagentoId as $magentoVariantId => $imageUrls) {
+            $shopifyVariantId = $variantIdByMagentoId[$magentoVariantId] ?? null;
             if (!$shopifyVariantId) {
                 continue;
             }
@@ -247,7 +246,7 @@ GQL;
     }
 
     /**
-     * @return array{variantIdByShopwareId: array<string, string>, errors?: mixed}
+     * @return array{variantIdByMagentoId: array<string, string>, errors?: mixed}
      */
     private function fetchShopifyVariantMap(Shop $shop, string $productGid): array
     {
@@ -268,7 +267,7 @@ GQL;
 
         $res = $this->client->query($shop, $query, ['id' => $productGid]);
         if (isset($res['errors'])) {
-            return ['variantIdByShopwareId' => [], 'errors' => $res['errors']];
+            return ['variantIdByMagentoId' => [], 'errors' => $res['errors']];
         }
 
         $nodes = data_get($res, 'data.product.variants.nodes', []);
@@ -283,7 +282,7 @@ GQL;
             }
         }
 
-        return ['variantIdByShopwareId' => $map];
+        return ['variantIdByMagentoId' => $map];
     }
 
     private function createMediaBatchFromUrls(Shop $shop, string $productGid, array $urls): array

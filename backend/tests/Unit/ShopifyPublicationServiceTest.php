@@ -141,8 +141,8 @@ class ShopifyPublicationServiceTest extends TestCase
         $productGid = 'gid://shopify/Product/999';
 
         // 1. Mapped markets in DB:
-        // Market 1 -> Shopware channel 111
-        // Market 2 -> Shopware channel 222
+        // Market 1 -> Magento store view 111
+        // Market 2 -> Magento store view 222
         ShopifyIdMapping::query()->create([
             'shop_id' => $shop->id,
             'entity_type' => 'market',

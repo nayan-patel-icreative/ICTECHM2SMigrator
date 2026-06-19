@@ -151,7 +151,7 @@ class MigrationController extends Controller
                 $issues[] = 'No variants generated (unexpected).';
             }
             if ($variantCount !== $expectedVariantCount) {
-                $issues[] = 'Variant audit mismatch: mapped variant count does not match Shopware child count.';
+                $issues[] = 'Variant audit mismatch: mapped variant count does not match Magento child count.';
             }
 
             $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -169,7 +169,7 @@ class MigrationController extends Controller
                 'has_cover' => $hasCover,
                 'categories' => $categorySummaries,
                 'variant_sample' => $variantSample,
-                'shopware_child_count' => $childCount,
+                'magento_child_count' => $childCount,
                 'expected_variant_count' => $expectedVariantCount,
                 'variant_count' => $variantCount,
                 'option_count' => $optionCount,
@@ -766,7 +766,7 @@ class MigrationController extends Controller
                 $issues[] = 'No variants generated (unexpected).';
             }
             if ($variantCount !== $expectedVariantCount) {
-                $issues[] = 'Variant audit mismatch: mapped variant count does not match Shopware child count.';
+                $issues[] = 'Variant audit mismatch: mapped variant count does not match Magento child count.';
             }
 
             $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -784,7 +784,7 @@ class MigrationController extends Controller
                 'has_cover' => $hasCover,
                 'categories' => $categorySummaries,
                 'variant_sample' => $variantSample,
-                'shopware_child_count' => $childCount,
+                'magento_child_count' => $childCount,
                 'expected_variant_count' => $expectedVariantCount,
                 'variant_count' => $variantCount,
                 'option_count' => $optionCount,

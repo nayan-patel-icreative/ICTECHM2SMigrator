@@ -95,7 +95,7 @@ class CustomerPayloadMapper
     /**
      * @return array<int, array{namespace: string, key: string, type: string, value: string}>
      */
-    public function mapShopwareMetafields(array $customer, ?Shop $shop = null, string $newsletterStatus = 'NOT_FOUND'): array
+    public function mapMagentoMetafields(array $customer, ?Shop $shop = null, string $newsletterStatus = 'NOT_FOUND'): array
     {
         $out = [];
 

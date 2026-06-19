@@ -50,7 +50,7 @@ class MagentoClient
                 'method' => $method,
                 'endpoint' => $endpoint,
                 'error' => $e->getMessage(),
-                'response' => $e->getResponse() ? (string)$e->getResponse()->getBody() : null
+                'response' => method_exists($e, 'getResponse') && $e->getResponse() ? (string)$e->getResponse()->getBody() : null
             ]);
             throw $e;
         }

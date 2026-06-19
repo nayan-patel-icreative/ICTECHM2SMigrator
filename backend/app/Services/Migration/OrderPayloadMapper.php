@@ -223,7 +223,7 @@ class OrderPayloadMapper
             return $v !== null;
         });
 
-        $metafields = $this->mapShopwareMetafields($shop, $order);
+        $metafields = $this->mapMagentoMetafields($shop, $order);
 
         return [
             'order' => $payload,
@@ -381,7 +381,7 @@ class OrderPayloadMapper
     /**
      * @return array<int, array{namespace: string, key: string, type: string, value: string}>
      */
-    public function mapShopwareMetafields(mixed $shop, array $order = []): array
+    public function mapMagentoMetafields(mixed $shop, array $order = []): array
     {
         if (is_array($shop) && $order === []) {
             $order = $shop;

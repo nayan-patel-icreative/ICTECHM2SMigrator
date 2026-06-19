@@ -6,7 +6,6 @@ use App\Models\Shop;
 use App\Models\ShopifyIdMapping;
 use App\Services\Shopify\ShopifyAdminGraphqlClient;
 use App\Services\Migration\ShopifyTranslationSyncService;
-use App\Services\Shopware\ShopwareClient;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -25,18 +24,18 @@ class ShopifyCollectionSyncService
     }
 
     /**
-     * @param  array<string, mixed>  $category  Shopware category entity (from product.categories)
+     * @param  array<string, mixed>  $category  Magento category entity (from product.categories)
      * @param  array<int, array{id: string, locale: string, name: string}>  $enabledLanguages  (optional)
      * @return array{collectionGid?: string, userErrors?: array<int, mixed>, errors?: mixed}
      */
-    public function upsertCollectionForCategoryAndAddProduct(Shop $shop, string $shopwareCategoryId, array $category, string $productGid, array $enabledLanguages = []): array
+    public function upsertCollectionForCategoryAndAddProduct(Shop $shop, string $magentoCategoryId, array $category, string $productGid, array $enabledLanguages = []): array
     {
         $input = $this->buildCollectionInput($category);
-        $cacheKey = "{$shop->id}:{$shopwareCategoryId}";
+        $cacheKey = "{$shop->id}:{$magentoCategoryId}";
         $collectionGid = $this->runCache[$cacheKey] ?? null;
 
         if (! $collectionGid) {
-            $ensure = $this->ensureCollectionExists($shop, $shopwareCategoryId, $input, $productGid);
+            $ensure = $this->ensureCollectionExists($shop, $magentoCategoryId, $input, $productGid);
             if (! empty($ensure['errors']) || ! empty($ensure['userErrors'])) {
                 return $ensure;
             }
@@ -58,7 +57,7 @@ class ShopifyCollectionSyncService
             } catch (\Throwable $e) {
                 Log::warning('Collection translation sync failed (collection still migrated)', [
                     'shop'                => $shop->shop_domain,
-                    'shopware_cat_id'     => $shopwareCategoryId,
+                    'magento_cat_id'      => $magentoCategoryId,
                     'collection_gid'      => $collectionGid,
                     'error'               => $e->getMessage(),
                 ]);
@@ -86,7 +85,7 @@ class ShopifyCollectionSyncService
         $seoDescription = $this->normalizeText(data_get($category, 'translated.metaDescription'))
             ?: $this->normalizeText(data_get($category, 'metaDescription'));
 
-        // Derive a deterministic handle from the Shopware SEO URL or the title.
+        // Derive a deterministic handle from the Magento SEO URL or the title.
         // Setting an explicit handle prevents Shopify from auto-creating a duplicate
         // collection (e.g. "men-2") when a "men" collection already exists.
         $handle = $this->deriveCollectionHandle($category, $title);
@@ -125,7 +124,7 @@ class ShopifyCollectionSyncService
      */
     private function deriveCollectionHandle(array $category, string $title): string
     {
-        // Prefer the Shopware SEO URL path as handle (most stable across runs)
+        // Prefer the Magento SEO URL path as handle (most stable across runs)
         $seoUrls = data_get($category, 'seoUrls', []);
         if (is_array($seoUrls)) {
             foreach ($seoUrls as $seo) {

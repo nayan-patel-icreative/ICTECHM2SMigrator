@@ -8,11 +8,11 @@ use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Downloads Shopware order documents (invoices, delivery notes, etc.) and uploads
+ * Downloads Magento order documents (invoices, delivery notes, etc.) and uploads
  * them to Shopify Files, returning the Shopify CDN URLs.
  *
  * Uses the EXACT same pattern as ShopifyMediaSyncService:
- *   1. Download PDF from Shopware (with Bearer token — required for /api/_action/document/)
+ *   1. Download PDF from Magento (with access token — required for REST / SOAP API or custom endpoints)
  *   2. stagedUploadsCreate (resource: FILE) → get S3 staging URL + params
  *   3. POST multipart to S3 staging URL (same as product images)
  *   4. fileCreate with resourceUrl → Shopify CDN URL
@@ -42,10 +42,10 @@ class ShopifyOrderDocumentSyncService
      * Returns enriched document records with shopifyFileUrl and shopifyFileGid.
      *
      * @param array<int, array{id: string, typeKey: string, typeName: string, documentNumber: string, createdAt: string, downloadUrl: string}> $documents
-     * @param string $shopwareToken  Shopware API access token for authenticated download
+     * @param string $magentoToken  Magento API access token for authenticated download
      * @return array<int, array{id: string, typeKey: string, typeName: string, documentNumber: string, createdAt: string, downloadUrl: string, shopifyFileUrl: string, shopifyFileGid: string}>
      */
-    public function uploadDocuments(Shop $shop, array $documents, string $shopwareToken): array
+    public function uploadDocuments(Shop $shop, array $documents, string $magentoToken): array
     {
         $results = [];
 
@@ -67,7 +67,7 @@ class ShopifyOrderDocumentSyncService
             }
 
             $filename = $this->buildFilename($typeName, $docNumber);
-            $uploaded = $this->uploadSingleDocument($shop, $downloadUrl, $filename, $shopwareToken);
+            $uploaded = $this->uploadSingleDocument($shop, $downloadUrl, $filename, $magentoToken);
 
             $results[] = array_merge($doc, [
                 'shopifyFileUrl' => $uploaded['fileUrl'] ?? '',
@@ -100,10 +100,10 @@ class ShopifyOrderDocumentSyncService
      *
      * @return array{fileUrl?: string, fileGid?: string, error?: string}
      */
-    private function uploadSingleDocument(Shop $shop, string $downloadUrl, string $filename, string $shopwareToken): array
+    private function uploadSingleDocument(Shop $shop, string $downloadUrl, string $filename, string $magentoToken): array
     {
-        // Step 1: Download PDF from Shopware to a temp file
-        $download = $this->downloadDocument($downloadUrl, $shopwareToken);
+        // Step 1: Download PDF from Magento to a temp file
+        $download = $this->downloadDocument($downloadUrl, $magentoToken);
         if (isset($download['error'])) {
             return ['error' => $download['error']];
         }
@@ -160,13 +160,13 @@ class ShopifyOrderDocumentSyncService
     }
 
     /**
-     * Download a document from Shopware.
-     * The /api/_action/document/ endpoint ALWAYS requires Authorization: Bearer.
+     * Download a document from Magento.
+     * The download endpoint ALWAYS requires Authorization: Bearer.
      * For ZUGFeRD documents that return XML, we request PDF explicitly.
      *
      * @return array{path?: string, size?: int, mime?: string, error?: string}
      */
-    private function downloadDocument(string $url, string $shopwareToken): array
+    private function downloadDocument(string $url, string $magentoToken): array
     {
         $tmp = tempnam(sys_get_temp_dir(), 'swdoc_');
         if ($tmp === false) {
@@ -195,7 +195,7 @@ class ShopifyOrderDocumentSyncService
                     'sink'    => $tmp,
                     'timeout' => 60,
                     'headers' => [
-                        'Authorization' => 'Bearer ' . $shopwareToken,
+                        'Authorization' => 'Bearer ' . $magentoToken,
                         'Accept'        => $accept,
                     ],
                 ]);

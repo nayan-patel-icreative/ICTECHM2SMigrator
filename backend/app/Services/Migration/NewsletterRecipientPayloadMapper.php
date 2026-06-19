@@ -14,13 +14,13 @@ class NewsletterRecipientPayloadMapper
         $email = trim((string) ($recipient['email'] ?? ''));
         $firstName = trim((string) ($recipient['firstName'] ?? ''));
         $lastName = trim((string) ($recipient['lastName'] ?? ''));
-        $tags = ['shopware_newsletter'];
+        $tags = ['magento_newsletter'];
 
         if ($shop) {
             $assignments = app(StateAssignmentMapper::class);
             $mappedSalutation = $assignments->mappedValue($shop, 'salutations', $this->salutationKey($recipient));
             if (is_string($mappedSalutation) && $mappedSalutation !== '') {
-                $tags[] = 'shopware_salutation:'.$assignments->optionLabel('salutations', $mappedSalutation);
+                $tags[] = 'magento_salutation:'.$assignments->optionLabel('salutations', $mappedSalutation);
             }
         }
 

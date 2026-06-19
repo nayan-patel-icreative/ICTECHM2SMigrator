@@ -39,7 +39,7 @@ class ProcessOrderMigrationItemJob implements ShouldQueue
     private array $order;
 
     /**
-     * SAFE CHANGE: Process exactly one Shopware order payload.
+     * SAFE CHANGE: Process exactly one Magento order payload.
      * Idempotent via migration_items unique key and ShopifyIdMapping.
      * Mapping logic is unchanged: reused from previous RunOrderMigrationJob.
      *

@@ -148,7 +148,7 @@ GQL;
     }
 
     /**
-     * Sync a single Shopware Sales Channel to a Shopify Market and Web Presence.
+     * Sync a single Magento Store View to a Shopify Market and Web Presence.
      * Handles force-reassigning of country code if it already belongs to another market.
      */
     public function syncMarket(Shop $shop, array $salesChannel): array
@@ -291,7 +291,7 @@ GQL;
             ];
         }
 
-        // Extract subfolder suffix or custom domain from Shopware domains
+        // Extract subfolder suffix or custom domain from Magento store views
         $webPresenceInput = $this->buildWebPresenceInput($salesChannel, $domains, $defaultLocale);
         $currentWebPresenceId = null;
         if (is_array($targetMarket) && isset($targetMarket['webPresences']) && is_array($targetMarket['webPresences'])) {
@@ -504,7 +504,7 @@ GQL;
 
     /**
      * Build input payload for webPresenceCreate / webPresenceUpdate.
-     * Collects the default locale plus any additional locales from Shopware domain entries
+     * Collects the default locale plus any additional locales from Magento store views
      * and maps them to Shopify's defaultLocale + alternateLocales fields.
      */
     private function buildWebPresenceInput(array $salesChannel, array $shopifyDomains, string $defaultLocale): array
@@ -533,7 +533,7 @@ GQL;
     }
 
     /**
-     * Map Shopware locale codes (e.g. de-DE, en-GB) to Shopify format.
+     * Map Magento locale codes (e.g. de-DE, en-GB) to Shopify format.
      */
     private function normalizeLocale(string $locale): string
     {

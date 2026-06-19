@@ -8,13 +8,13 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Syncs Shopware translated content to Shopify via two mechanisms:
+ * Syncs Magento translated content to Shopify via two mechanisms:
  *
  * 1. Shopify Translations API (translationsRegister mutation) — pushes locale-specific
  *    strings into Shopify's native multilingual system for storefront display.
  *
  * 2. Shopify Metafields — stores a JSON snapshot of all translations under the
- *    'shopware_translations' namespace for reference/custom usage.
+ *    'magento_translations' namespace for reference/custom usage.
  *
  * Design principles:
  * - NEVER throws exceptions — all errors are logged and returned as soft failures.
@@ -26,7 +26,7 @@ class ShopifyTranslationSyncService
     private ShopifyAdminGraphqlClient $client;
 
     /**
-     * Mapping from Shopware translation field name → Shopify translation key.
+     * Mapping from Magento translation field name → Shopify translation key.
      * These are the standard keys recognised by Shopify's Translations API.
      */
     private const FIELD_MAP = [
@@ -57,7 +57,7 @@ class ShopifyTranslationSyncService
      *
      * @param  array<string, array<string, string>>  $translationsByLocale
      *         Format: ['de-DE' => ['name' => '...', 'description' => '...'], ...]
-     *         Keys are Shopware field names (name, description, metaTitle, metaDescription).
+     *         Keys are Magento field names (name, description, metaTitle, metaDescription).
      * @param  array<string, string>  $fieldMap  Optional override of FIELD_MAP
      * @return array{ok?: bool, errors?: mixed}
      */
@@ -220,7 +220,7 @@ GQL;
             $res = $this->client->query($shop, $mutation, [
                 'metafields' => [[
                     'ownerId'   => $resourceGid,
-                    'namespace' => 'shopware_translations',
+                    'namespace' => 'magento_translations',
                     'key'       => 'language_preference',
                     'type'      => 'json',
                     'value'     => $value,
@@ -288,7 +288,7 @@ GQL;
 
     /**
      * Store all translations as a single JSON metafield for reference.
-     * Namespace: 'shopware_translations', key: 'all_translations'
+     * Namespace: 'magento_translations', key: 'all_translations'
      *
      * @param  array<string, array<string, string>>  $translationsByLocale
      */
@@ -315,7 +315,7 @@ GQL;
         $res = $this->client->query($shop, $mutation, [
             'metafields' => [[
                 'ownerId'   => $resourceGid,
-                'namespace' => 'shopware_translations',
+                'namespace' => 'magento_translations',
                 'key'       => 'all_translations',
                 'type'      => 'json',
                 'value'     => $json,
@@ -335,16 +335,16 @@ GQL;
     }
 
     /**
-     * Extract translations from a Shopware entity's 'translations' association.
+     * Extract translations from a Magento entity's 'translations' association.
      *
-     * Shopware returns translations as an array of objects, each with:
+     * Magento returns translations as an array of objects, each with:
      * - languageId
      * - name, description, metaTitle, metaDescription, etc.
      *
      * We map languageId → locale using the enabledLanguages list and return
      * only translations for the enabled languages.
      *
-     * @param  array<string, mixed>  $entity          Shopware entity (product, category, etc.)
+     * @param  array<string, mixed>  $entity          Magento entity (product, category, etc.)
      * @param  array<int, array{id: string, locale: string, name: string}>  $enabledLanguages
      * @return array<string, array<string, string>>  locale => [field => value]
      */

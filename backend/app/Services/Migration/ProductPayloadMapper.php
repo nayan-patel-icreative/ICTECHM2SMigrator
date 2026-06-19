@@ -277,7 +277,7 @@ class ProductPayloadMapper
      * Map variant prices for external Price List.
      */
     public function extractVariantPricesForPriceList(
-        array $variantIdByShopwareId,
+        array $variantIdByMagentoId,
         array $parent,
         array $children,
         ?Shop $shop = null,
@@ -302,7 +302,7 @@ class ProductPayloadMapper
             $price = $this->moneyToPrice($parent, $parent, $priceMode);
             $compareAt = $this->moneyToCompareAtPrice($parent, $parent, $priceMode);
 
-            $gids = count($variantIdByShopwareId) > 0 ? array_values($variantIdByShopwareId) : $allVariantGids;
+            $gids = count($variantIdByMagentoId) > 0 ? array_values($variantIdByMagentoId) : $allVariantGids;
             foreach ($gids as $variantGid) {
                 if (is_string($variantGid) && $variantGid !== '') {
                     $variantPrices[$variantGid] = $price;
@@ -315,7 +315,7 @@ class ProductPayloadMapper
                 if ($mId === '') {
                     continue;
                 }
-                $variantGid = $variantIdByShopwareId[$mId] ?? null;
+                $variantGid = $variantIdByMagentoId[$mId] ?? null;
                 if (!$variantGid) {
                     continue;
                 }
@@ -336,7 +336,7 @@ class ProductPayloadMapper
     /**
      * Map product metafields.
      */
-    public function mapShopwareMetafields(array $parent, array $children = [], ?Shop $shop = null, string $priceMode = 'gross'): array
+    public function mapMagentoMetafields(array $parent, array $children = [], ?Shop $shop = null, string $priceMode = 'gross'): array
     {
         $out = [];
         // Magento Custom ID (type: id)

@@ -80,7 +80,7 @@ function LanguageSelectionCard({ api, languageConfig, onSave, saving }) {
   useEffect(() => {
     setFetching(true)
     setFetchError(null)
-    api.get('/api/shopware-languages')
+    api.get('/api/magento-languages')
       .then((data) => {
         const fetched = Array.isArray(data?.languages) ? data.languages : []
         setLocalConfig(mergeLanguages(fetched, languageConfig))
@@ -322,8 +322,8 @@ function App() {
   }, [])
 
   const connectionQuery = useQuery({
-    queryKey: ['shopware-connection'],
-    queryFn: () => api.get('/api/shopware-connection'),
+    queryKey: ['magento-connection'],
+    queryFn: () => api.get('/api/magento-connection'),
   })
 
   const previewFilteredOrderMigration = useMutation({
@@ -628,7 +628,7 @@ function App() {
   })
 
   const saveConnection = useMutation({
-    mutationFn: (payload) => api.post('/api/shopware-connection', payload),
+    mutationFn: (payload) => api.post('/api/magento-connection', payload),
     onSuccess: () => {
       setError(null)
       setFieldErrors({})
@@ -1217,7 +1217,7 @@ function App() {
                               </Text>
                               <Text as="span">
                                 {' '}
-                                — Magento children: {it.shopware_child_count ?? '-'}; mapped variants: {it.variant_count ?? '-'} (expected:{' '}
+                                — Magento children: {it.magento_child_count ?? '-'}; mapped variants: {it.variant_count ?? '-'} (expected:{' '}
                                 {it.expected_variant_count ?? '-'}) ; options: {it.option_count ?? '-'}; bytes: {it.payload_bytes ?? '-'}
                               </Text>
                               {sample.length > 0 ? (
@@ -2462,7 +2462,7 @@ function App() {
                                   </Text>
                                   <Text as="span">
                                     {' '}
-                                    — Magento children: {it.shopware_child_count ?? '-'}; mapped variants: {it.variant_count ?? '-'} (expected:{' '}
+                                    — Magento children: {it.magento_child_count ?? '-'}; mapped variants: {it.variant_count ?? '-'} (expected:{' '}
                                     {it.expected_variant_count ?? '-'})
                                   </Text>
                                   <Box paddingBlockStart="100">
@@ -2900,7 +2900,7 @@ function App() {
                                   — {it.first_name || '-'} {it.last_name || '-'}; addresses: {it.addresses_count ?? 0}
                                 </Text>
 
-                                {it.payload || it.shopware_raw || it.shopware_metafields ? (
+                                {it.payload || it.magento_raw || it.magento_metafields ? (
                                   <Box paddingBlockStart="150">
                                     <ButtonGroup>
                                       <Button
@@ -2929,14 +2929,14 @@ function App() {
                                                 <Text as="span">{it.email || '-'}</Text>
 
                                                 <Text as="span" tone="subdued">Phone:</Text>
-                                                <Text as="span">{it.payload?.phone || it.shopware_raw?.telephone || '-'}</Text>
+                                                <Text as="span">{it.payload?.phone || it.magento_raw?.telephone || '-'}</Text>
 
                                                 <Text as="span" tone="subdued">Magento Group ID:</Text>
-                                                <Text as="span">{it.shopware_raw?.group_id || '-'}</Text>
+                                                <Text as="span">{it.magento_raw?.group_id || '-'}</Text>
 
                                                 <Text as="span" tone="subdued">Newsletter Subscription:</Text>
                                                 <span style={{ display: 'inline-flex' }}>
-                                                  {it.shopware_raw?.extension_attributes?.is_subscribed ? (
+                                                  {it.magento_raw?.extension_attributes?.is_subscribed ? (
                                                     <span style={{ backgroundColor: '#e2f9e4', color: '#1f6a27', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
                                                       Subscribed (Magento)
                                                     </span>
@@ -3417,7 +3417,7 @@ function App() {
                                   — {it.email || '-'}; items: {it.line_items_count ?? 0}; {it.currency || '-'}
                                 </Text>
 
-                                {it.payload || it.shopware_raw || it.shopware_metafields ? (
+                                {it.payload || it.magento_raw || it.magento_metafields ? (
                                   <Box paddingBlockStart="150">
                                     <ButtonGroup>
                                       <Button
@@ -3451,7 +3451,7 @@ function App() {
                                           </Box>
                                         ) : null}
 
-                                        {it.shopware_metafields ? (
+                                        {it.magento_metafields ? (
                                           <Box paddingBlockStart="150">
                                             <Text as="p" tone="subdued">
                                               Magento metafields
@@ -3465,13 +3465,13 @@ function App() {
                                               overflowX="scroll"
                                             >
                                               <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                                                {JSON.stringify(it.shopware_metafields, null, 2)}
+                                                {JSON.stringify(it.magento_metafields, null, 2)}
                                               </pre>
                                             </Box>
                                           </Box>
                                         ) : null}
 
-                                        {it.shopware_raw ? (
+                                        {it.magento_raw ? (
                                           <Box paddingBlockStart="150">
                                             <Text as="p" tone="subdued">
                                               Magento raw
@@ -3485,7 +3485,7 @@ function App() {
                                               overflowX="scroll"
                                             >
                                               <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                                                {JSON.stringify(it.shopware_raw, null, 2)}
+                                                {JSON.stringify(it.magento_raw, null, 2)}
                                               </pre>
                                             </Box>
                                           </Box>
@@ -3733,7 +3733,7 @@ function App() {
                                   — {it.active ? 'Active' : 'Inactive'}
                                 </Text>
 
-                                {it.payload || it.shopware_raw ? (
+                                {it.payload || it.magento_raw ? (
                                   <Box paddingBlockStart="150">
                                     <ButtonGroup>
                                       <Button
@@ -3753,17 +3753,17 @@ function App() {
                                               <Text as="h4" variant="headingSm">Newsletter Subscriber Details</Text>
                                               <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: '8px 16px', fontSize: '13px' }}>
                                                 <Text as="span" tone="subdued">Subscriber ID:</Text>
-                                                <Text as="span" fontWeight="medium">{it.source_id || it.shopware_raw?.subscriber_id || '-'}</Text>
+                                                <Text as="span" fontWeight="medium">{it.source_id || it.magento_raw?.subscriber_id || '-'}</Text>
 
                                                 <Text as="span" tone="subdued">Customer ID:</Text>
-                                                <Text as="span">{it.shopware_raw?.customer_id || '-'}</Text>
+                                                <Text as="span">{it.magento_raw?.customer_id || '-'}</Text>
 
                                                 <Text as="span" tone="subdued">Email:</Text>
                                                 <Text as="span">{it.email || '-'}</Text>
 
                                                 <Text as="span" tone="subdued">Subscriber Status:</Text>
                                                 <span style={{ display: 'inline-flex' }}>
-                                                  {it.shopware_raw?.subscriber_status === 1 || it.active ? (
+                                                  {it.magento_raw?.subscriber_status === 1 || it.active ? (
                                                     <span style={{ backgroundColor: '#e2f9e4', color: '#1f6a27', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
                                                       Subscribed
                                                     </span>
@@ -3788,7 +3788,7 @@ function App() {
                                                 </span>
 
                                                 <Text as="span" tone="subdued">Store ID / View:</Text>
-                                                <Text as="span">{it.shopware_raw?.store_id || '-'}</Text>
+                                                <Text as="span">{it.magento_raw?.store_id || '-'}</Text>
                                               </div>
                                             </BlockStack>
                                           </BlockStack>

@@ -90,8 +90,8 @@ class OrderMigrationController extends Controller
 
             if ($includePayload) {
                 $out['payload'] = $payload;
-                $out['shopware_metafields'] = [];
-                $out['shopware_raw'] = $mapped['magento_raw'] ?? [];
+                $out['magento_metafields'] = [];
+                $out['magento_raw'] = $mapped['magento_raw'] ?? [];
             }
 
             $items[] = $out;
@@ -161,8 +161,8 @@ class OrderMigrationController extends Controller
 
             if ($includePayload) {
                 $out['payload'] = $payload;
-                $out['shopware_metafields'] = [];
-                $out['shopware_raw'] = $mapped['magento_raw'] ?? [];
+                $out['magento_metafields'] = [];
+                $out['magento_raw'] = $mapped['magento_raw'] ?? [];
             }
 
             $items[] = $out;

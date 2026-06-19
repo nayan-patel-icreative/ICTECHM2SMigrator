@@ -159,7 +159,7 @@ class RunCustomerMigrationJob implements ShouldQueue
                     // so that changes in newsletter subscription trigger re-migration
                     $fp = $fingerprints->make($payload);
 
-                    $metafields = $mapper->mapShopwareMetafields($c, $shop, $newsletterStatus);
+                    $metafields = $mapper->mapMagentoMetafields($c, $shop, $newsletterStatus);
                     if (is_array($metafields) && count($metafields) > 0) {
                         $payload['__metafields'] = $metafields;
                     }

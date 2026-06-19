@@ -8,11 +8,11 @@ use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Downloads Shopware digital product files and uploads them to Shopify Files CDN,
+ * Downloads Magento digital product files and uploads them to Shopify Files CDN,
  * returning the public CDN URLs.
  *
- * Shopware private digital download files have media.private=true and media.url="" (empty).
- * The file lives in the Shopware private filesystem ({files_path}/media/xx/xx/xx/filename.ext).
+ * Magento private digital download files have media.private=true and media.url="" (empty).
+ * The file lives in the Magento private filesystem ({files_path}/media/xx/xx/xx/filename.ext).
  *
  * Download strategy (tried in order):
  *   1. Public HTTP URL  – media.private=false AND media.url starts with http/https
@@ -46,18 +46,18 @@ class ShopifyDigitalFileSyncService
      *   url: string, mediaId: string, fileName: string, fileExtension: string,
      *   mimeType: string, path: string, private: bool, hasFile: bool
      * }> $files
-     * @param string $shopwareBaseUrl  e.g. "http://localhost/SW6771/public"
-     * @param string $shopwareToken    Shopware API Bearer token
-     * @param string $shopwareFilesPath  Absolute path to Shopware private files dir
-     *                                   e.g. "/var/www/html/SW6771/files"
+     * @param string $magentoBaseUrl  e.g. "http://magentonew.local"
+     * @param string $magentoToken    Magento API Bearer token
+     * @param string $magentoFilesPath  Absolute path to Magento private files dir
+     *                                   e.g. "/var/www/html/magento/files"
      * @return array<int, array{fileName: string, shopifyFileUrl: string, shopifyFileGid: string, error?: string}>
      */
     public function uploadDigitalFiles(
         Shop   $shop,
         array  $files,
-        string $shopwareBaseUrl,
-        string $shopwareToken,
-        string $shopwareFilesPath = ''
+        string $magentoBaseUrl,
+        string $magentoToken,
+        string $magentoFilesPath = ''
     ): array {
         $results = [];
 
@@ -73,15 +73,15 @@ class ShopifyDigitalFileSyncService
 
             $displayName = $fileName !== '' ? ($ext !== '' ? $fileName . '.' . $ext : $fileName) : $mediaId;
 
-            // If Shopware says hasFile=false, there is no file — skip entirely.
+            // If Magento says hasFile=false, there is no file — skip entirely.
             if (!$hasFile) {
                 $results[] = [
                     'fileName'       => $displayName,
                     'shopifyFileUrl' => '',
                     'shopifyFileGid' => '',
-                    'error'          => 'Shopware media entity has hasFile=false (no file stored)',
+                    'error'          => 'Magento media entity has hasFile=false (no file stored)',
                 ];
-                Log::warning('Digital file skipped — Shopware hasFile=false', [
+                Log::warning('Digital file skipped — Magento hasFile=false', [
                     'shop'      => $shop->shop_domain,
                     'mediaId'   => $mediaId,
                     'fileName'  => $displayName,
@@ -97,9 +97,9 @@ class ShopifyDigitalFileSyncService
                 $displayName,
                 $mime,
                 $isPrivate,
-                $shopwareBaseUrl,
-                $shopwareToken,
-                $shopwareFilesPath
+                $magentoBaseUrl,
+                $magentoToken,
+                $magentoFilesPath
             );
 
             $results[] = [
@@ -147,9 +147,9 @@ class ShopifyDigitalFileSyncService
         string $displayName,
         string $mime,
         bool   $isPrivate,
-        string $shopwareBaseUrl,
-        string $shopwareToken,
-        string $shopwareFilesPath
+        string $magentoBaseUrl,
+        string $magentoToken,
+        string $magentoFilesPath
     ): array {
         $errors = [];
 
@@ -173,11 +173,11 @@ class ShopifyDigitalFileSyncService
         }
 
         // ── Strategy 2: Local filesystem read ────────────────────────────────
-        // Shopware stores private media in {files_path}/media/xx/xx/xx/file.ext.
-        // When the migrator runs on the same server as Shopware, we can read
+        // Magento stores private media in {files_path}/media/xx/xx/xx/file.ext.
+        // When the migrator runs on the same server as Magento, we can read
         // directly from disk — this is the most reliable approach for private files.
-        if ($mediaPath !== '' && $shopwareFilesPath !== '') {
-            $diskPath = rtrim($shopwareFilesPath, '/') . '/' . ltrim($mediaPath, '/');
+        if ($mediaPath !== '' && $magentoFilesPath !== '') {
+            $diskPath = rtrim($magentoFilesPath, '/') . '/' . ltrim($mediaPath, '/');
             if (file_exists($diskPath) && is_readable($diskPath) && filesize($diskPath) > 0) {
                 $result = $this->uploadFromDisk($shop, $diskPath, $displayName, $mime);
                 if (!isset($result['error'])) {
@@ -194,7 +194,7 @@ class ShopifyDigitalFileSyncService
         // For non-private files where media.url is empty but media.path is set,
         // try constructing the URL as {base_url}/{path}.
         if (!$isPrivate && $mediaPath !== '') {
-            $builtUrl = rtrim($shopwareBaseUrl, '/') . '/' . ltrim($mediaPath, '/');
+            $builtUrl = rtrim($magentoBaseUrl, '/') . '/' . ltrim($mediaPath, '/');
             $download = $this->downloadFile($builtUrl, '', $mime);
             if (!isset($download['error'])) {
                 $result = $this->stageAndCreate($shop, $download, $displayName, $mime);
@@ -210,10 +210,10 @@ class ShopifyDigitalFileSyncService
 
         // ── Strategy 4: Authenticated API download ───────────────────────────
         // Last resort: GET /api/_action/media/{mediaId}/download with Bearer token.
-        // This route exists in some Shopware versions/plugins but 404s in core.
-        if ($mediaId !== '' && $shopwareToken !== '') {
-            $apiUrl = rtrim($shopwareBaseUrl, '/') . '/api/_action/media/' . $mediaId . '/download';
-            $download = $this->downloadFile($apiUrl, $shopwareToken, $mime);
+        // This route exists in some Magento/plugin versions but 404s in core.
+        if ($mediaId !== '' && $magentoToken !== '') {
+            $apiUrl = rtrim($magentoBaseUrl, '/') . '/api/_action/media/' . $mediaId . '/download';
+            $download = $this->downloadFile($apiUrl, $magentoToken, $mime);
             if (!isset($download['error'])) {
                 $result = $this->stageAndCreate($shop, $download, $displayName, $mime);
                 if (!isset($result['error'])) {
@@ -268,7 +268,7 @@ class ShopifyDigitalFileSyncService
             'path' => $diskPath,
             'size' => $size,
             'mime' => $mime,
-            'own'  => false,   // do NOT unlink — the file belongs to Shopware
+            'own'  => false,   // do NOT unlink — the file belongs to Magento
         ], $filename, $mime);
     }
 

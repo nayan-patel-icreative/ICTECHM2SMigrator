@@ -127,7 +127,7 @@ class ShopifyTranslationSyncServiceTest extends TestCase
 
                 if (str_contains($query, 'SetTranslationMeta')) {
                     $this->assertSame('gid://shopify/Product/1', $variables['metafields'][0]['ownerId']);
-                    $this->assertSame('shopware_translations', $variables['metafields'][0]['namespace']);
+                    $this->assertSame('magento_translations', $variables['metafields'][0]['namespace']);
                     $this->assertSame('all_translations', $variables['metafields'][0]['key']);
                     
                     $decoded = json_decode($variables['metafields'][0]['value'], true);
@@ -288,7 +288,7 @@ class ShopifyTranslationSyncServiceTest extends TestCase
 
                 if (str_contains($query, 'SetTranslationMeta')) {
                     $this->assertSame('gid://shopify/Collection/1', $variables['metafields'][0]['ownerId']);
-                    $this->assertSame('shopware_translations', $variables['metafields'][0]['namespace']);
+                    $this->assertSame('magento_translations', $variables['metafields'][0]['namespace']);
                     $this->assertSame('all_translations', $variables['metafields'][0]['key']);
                     
                     $decoded = json_decode($variables['metafields'][0]['value'], true);
@@ -331,7 +331,7 @@ class ShopifyTranslationSyncServiceTest extends TestCase
             ->willReturnCallback(function ($passedShop, $query, $variables = []) {
                 $this->assertTrue(str_contains($query, 'SetTranslationMeta'));
                 $this->assertSame('gid://shopify/Customer/1', $variables['metafields'][0]['ownerId']);
-                $this->assertSame('shopware_translations', $variables['metafields'][0]['namespace']);
+                $this->assertSame('magento_translations', $variables['metafields'][0]['namespace']);
                 $this->assertSame('language_preference', $variables['metafields'][0]['key']);
                 $this->assertSame('json', $variables['metafields'][0]['type']);
                 

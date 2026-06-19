@@ -10,7 +10,7 @@ class StateMapping extends Model
     protected $fillable = [
         'shop_id',
         'state_type',
-        'shopware_state',
+        'magento_state',
         'shopify_status',
     ];
 

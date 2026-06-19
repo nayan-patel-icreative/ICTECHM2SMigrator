@@ -40,7 +40,7 @@ class MagentoConnectionTest extends TestCase
         $headers = $this->getAuthHeader($shop);
 
         // 1. Get connection when none exists
-        $response = $this->withHeaders($headers)->get('/api/shopware-connection');
+        $response = $this->withHeaders($headers)->get('/api/magento-connection');
         $response->assertOk();
         $response->assertJson(['connected' => false]);
 
@@ -59,7 +59,14 @@ class MagentoConnectionTest extends TestCase
             'files_path' => '/var/www/magento/pub/media',
         ];
 
-        $response = $this->withHeaders($headers)->postJson('/api/shopware-connection', $payload);
+        // Mock MagentoClient to verify connectivity
+        $mockClient = $this->createMock(MagentoClient::class);
+        $mockClient->expects($this->any())
+            ->method('request')
+            ->willReturn([]);
+        $this->app->instance(MagentoClient::class, $mockClient);
+
+        $response = $this->withHeaders($headers)->postJson('/api/magento-connection', $payload);
         $response->assertOk();
         $response->assertJson([
             'connected' => true,
@@ -79,7 +86,7 @@ class MagentoConnectionTest extends TestCase
         $this->assertSame($langConfig, $conn->language_config);
 
         // 3. Fetch connection again, verify config is returned
-        $response = $this->withHeaders($headers)->get('/api/shopware-connection');
+        $response = $this->withHeaders($headers)->get('/api/magento-connection');
         $response->assertOk();
         $response->assertJson([
             'connected' => true,
@@ -123,18 +130,13 @@ class MagentoConnectionTest extends TestCase
 
         $this->app->instance(MagentoClient::class, $mockClient);
 
-        $response = $this->withHeaders($headers)->get('/api/shopware-languages');
+        $response = $this->withHeaders($headers)->get('/api/magento-languages');
         $response->assertOk();
         $response->assertJson([
             'languages' => [
                 [
-                    'id' => '1',
-                    'name' => 'Default Store View (en-US)',
-                    'locale' => 'en-US',
-                ],
-                [
-                    'id' => '2',
-                    'name' => 'German Store View (de-DE)',
+                    'id' => 'de-DE',
+                    'name' => 'German (de-DE)',
                     'locale' => 'de-DE',
                 ],
             ]

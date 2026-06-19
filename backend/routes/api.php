@@ -22,10 +22,10 @@ Route::middleware(['shopify.session_token'])->group(function () {
 
         Route::get('/queue/health', [QueueHealthController::class, 'show']);
 
-        Route::get('/shopware-connection', [MagentoConnectionController::class, 'show']);
-        Route::post('/shopware-connection', [MagentoConnectionController::class, 'store']);
-        Route::get('/shopware-languages', [MagentoConnectionController::class, 'languages']);
-        Route::get('/shopware-sales-channels', [MagentoConnectionController::class, 'storeViews']);
+        Route::get('/magento-connection', [MagentoConnectionController::class, 'show']);
+        Route::post('/magento-connection', [MagentoConnectionController::class, 'store']);
+        Route::get('/magento-languages', [MagentoConnectionController::class, 'languages']);
+        Route::get('/magento-store-views', [MagentoConnectionController::class, 'storeViews']);
 
         Route::get('/state-mappings', [StateMappingController::class, 'show']);
         Route::post('/state-mappings', [StateMappingController::class, 'store']);

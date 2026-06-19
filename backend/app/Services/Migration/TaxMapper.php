@@ -5,7 +5,7 @@ namespace App\Services\Migration;
 class TaxMapper
 {
     /**
-     * Resolve taxable flag from Shopware product/variant tax data.
+     * Resolve taxable flag from Magento product/variant tax data.
      * Falls back to parent product tax if variant has none.
      *
      * Rules:

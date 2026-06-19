@@ -64,11 +64,11 @@ GQL;
     }
 
     /**
-     * @return array{productGid?: string, variantIdByShopwareId?: array<string, string>, userErrors?: array<int, mixed>, errors?: mixed}
+     * @return array{productGid?: string, variantIdByMagentoId?: array<string, string>, userErrors?: array<int, mixed>, errors?: mixed}
      */
     public function upsertByCustomId(Shop $shop, string $sourceId, array $productSetPayload): array
     {
-        $ensure = $this->ensureShopwareIdMetafieldDefinition($shop);
+        $ensure = $this->ensureMagentoIdMetafieldDefinition($shop);
         if (! empty($ensure['errors']) || ! empty($ensure['userErrors'])) {
             return $ensure;
         }
@@ -100,9 +100,9 @@ mutation UpsertProduct($input: ProductSetInput!, $identifier: ProductSetIdentifi
 }
 GQL;
 
-        $shopwareId = trim($sourceId);
-        if ($shopwareId === '') {
-            return ['userErrors' => [['message' => 'Missing Shopware sourceId for identifier']]];
+        $magentoId = trim($sourceId);
+        if ($magentoId === '') {
+            return ['userErrors' => [['message' => 'Missing Magento sourceId for identifier']]];
         }
 
         $existingGid = null;
@@ -111,7 +111,7 @@ GQL;
         $mapping = \App\Models\ShopifyIdMapping::query()
             ->where('shop_id', $shop->id)
             ->where('entity_type', 'product')
-            ->where('source_id', $shopwareId)
+            ->where('source_id', $magentoId)
             ->first();
         if ($mapping && is_string($mapping->shopify_gid) && $mapping->shopify_gid !== '') {
             if ($this->productExists($shop, $mapping->shopify_gid)) {
@@ -130,7 +130,7 @@ GQL;
                 \App\Models\ShopifyIdMapping::query()->updateOrCreate([
                     'shop_id' => $shop->id,
                     'entity_type' => 'product',
-                    'source_id' => $shopwareId,
+                    'source_id' => $magentoId,
                 ], [
                     'shopify_gid' => $existingGid,
                 ]);
@@ -144,7 +144,7 @@ GQL;
             $identifier['customId'] = [
                 'namespace' => self::CUSTOM_ID_NAMESPACE,
                 'key' => self::CUSTOM_ID_KEY,
-                'value' => $shopwareId,
+                'value' => $magentoId,
             ];
         }
 
@@ -166,7 +166,7 @@ GQL;
         if (is_string($productId) && $productId !== '') {
             return [
                 'productGid' => $productId,
-                'variantIdByShopwareId' => $this->variantMapFromProductSetResponse($res),
+                'variantIdByMagentoId' => $this->variantMapFromProductSetResponse($res),
                 'allVariantGids' => $this->allVariantGidsFromProductSetResponse($res),
             ];
         }
@@ -189,7 +189,7 @@ GQL;
      */
     public function warmupProductDefinitions(Shop $shop): array
     {
-        $custom = $this->ensureShopwareIdMetafieldDefinition($shop);
+        $custom = $this->ensureMagentoIdMetafieldDefinition($shop);
         if (!empty($custom['errors']) || !empty($custom['userErrors'])) {
             return $custom;
         }
@@ -199,12 +199,12 @@ GQL;
 
     /**
      * Shopify requires the metafield definition to exist when using ProductSetIdentifiers.customId.
-     * Also ensures the PRODUCTVARIANT-level shopware.variant_id definition exists so that
+     * Also ensures the PRODUCTVARIANT-level magento.variant_id definition exists so that
      * variant_id metafields stored during productSet are queryable (needed for image association).
      *
      * @return array{ok?: bool, userErrors?: array<int, mixed>, errors?: mixed}
      */
-    private function ensureShopwareIdMetafieldDefinition(Shop $shop): array
+    private function ensureMagentoIdMetafieldDefinition(Shop $shop): array
     {
         $cacheKey = 'shopify:product_custom_id_definition_ensured_v2:'.$shop->id;
         if (Cache::get($cacheKey)) {
@@ -552,7 +552,7 @@ GQL;
 
     /**
      * Return all variant GIDs from the productSet response (used for simple products
-     * that have no Shopware variant ID metafield but still need price list sync).
+     * that have no Magento variant ID metafield but still need price list sync).
      *
      * @param  array<string, mixed>  $res
      * @return array<int, string>
@@ -634,7 +634,7 @@ GQL;
     }
 
     /**
-     * Ensure the Shopware Download Links metafield definition exists for a given owner type.
+     * Ensure the Magento Download Links metafield definition exists for a given owner type.
      * Uses type 'list.link' (Link list).
      */
     public function ensureDownloadLinksMetafieldDefinition(Shop $shop, string $ownerType): array

@@ -88,8 +88,8 @@ class CustomerMigrationController extends Controller
 
             if ($includePayload) {
                 $out['payload'] = $payload;
-                $out['shopware_metafields'] = []; // Magento metafields or custom attributes mapped as needed
-                $out['shopware_raw'] = $c;
+                $out['magento_metafields'] = []; // Magento metafields or custom attributes mapped as needed
+                $out['magento_raw'] = $c;
             }
 
             $items[] = $out;
@@ -157,8 +157,8 @@ class CustomerMigrationController extends Controller
 
             if ($includePayload) {
                 $out['payload'] = $payload;
-                $out['shopware_metafields'] = []; // Magento metafields or custom attributes mapped as needed
-                $out['shopware_raw'] = $c;
+                $out['magento_metafields'] = []; // Magento metafields or custom attributes mapped as needed
+                $out['magento_raw'] = $c;
             }
 
             $items[] = $out;

@@ -8,12 +8,12 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Syncs Shopware product prices into Shopify using the correct currency.
+ * Syncs Magento product prices into Shopify using the correct currency.
  *
  * Strategy:
- *   1. Detect the Shopware product currency (e.g. GBP).
+ *   1. Detect the Magento product currency (e.g. GBP).
  *   2. If the Shopify store's primary market already uses that currency → prices are already correct.
- *   3. If not → update the primary market's currency to match Shopware via marketCurrencySettingsUpdate.
+ *   3. If not → update the primary market's currency to match Magento via marketCurrencySettingsUpdate.
  *      This is the same mechanism that makes orderCreate show £ instead of ₹.
  *   4. Additionally, set fixed prices on a currency-specific price list so the prices
  *      are explicitly recorded in the correct currency for all markets.
@@ -28,7 +28,7 @@ class ShopifyPriceListSyncService
     }
 
     /**
-     * Ensure the store's primary market currency matches the Shopware product currency,
+     * Ensure the store's primary market currency matches the Magento product currency,
      * then set fixed prices on the matching price list.
      *
      * @param array<string, string> $variantPrices        variantGid => gross price string
@@ -36,16 +36,16 @@ class ShopifyPriceListSyncService
      * @return array{ok?: bool, skipped?: bool, userErrors?: array<int, mixed>, errors?: mixed}
      */
     public function syncVariantPrices(        Shop $shop,
-        string $currencyCode,
-        array $variantPrices,
-        array $variantComparePrices = []
-    ): array {
-        $currencyCode = strtoupper(trim($currencyCode));
-        if ($currencyCode === '' || count($variantPrices) === 0) {
-            return ['ok' => true, 'skipped' => true];
-        }
-
-        // Step 1: Ensure the primary market uses the Shopware currency
+         string $currencyCode,
+         array $variantPrices,
+         array $variantComparePrices = []
+     ): array {
+         $currencyCode = strtoupper(trim($currencyCode));
+         if ($currencyCode === '' || count($variantPrices) === 0) {
+             return ['ok' => true, 'skipped' => true];
+         }
+ 
+         // Step 1: Ensure the primary market uses the Magento currency
         $marketResult = $this->ensurePrimaryMarketCurrency($shop, $currencyCode);
         if (!empty($marketResult['errors']) || !empty($marketResult['userErrors'])) {
             Log::warning('Could not update primary market currency; price list sync may show wrong currency', [
@@ -127,8 +127,8 @@ GQL;
     }
 
     /**
-     * Sync Shopware advanced (rule-based) prices to dedicated Shopify price lists.
-     * One price list per ruleId, named "Shopware Advanced Prices – {ruleId}".
+     * Sync Magento advanced (rule-based) prices to dedicated Shopify price lists.
+     * One price list per ruleId, named "Magento Advanced Prices – {ruleId}".
      * Non-fatal: errors are returned but never thrown.
      *
      * @param array<string, array{ruleName: string, entries: array<int, array{variantGid: string, amount: string, currencyCode: string, compareAt: string|null, quantityMin: int, ruleName: string}>}> $groupedEntries Output of AdvancedPriceMapper::map()
@@ -147,7 +147,7 @@ GQL;
                 continue;
             }
 
-            $listName = 'Shopware Advanced Prices - ' . $ruleId;
+            $listName = 'Magento Advanced Prices - ' . $ruleId;
             $cacheKey = 'shopify:adv_price_list_gid:' . $shop->id . ':' . $ruleId . ':' . strtoupper($currencyCode);
 
             $priceListGid = $this->resolvePriceList($shop, $currencyCode, $listName, $cacheKey);
@@ -268,7 +268,7 @@ GQL;
                 return ['ok' => true, 'skipped' => true];
             }
 
-            // Update the primary market's currency to match Shopware
+            // Update the primary market's currency to match Magento
             $mutation = <<<'GQL'
 mutation UpdateMarketCurrency($marketId: ID!, $input: MarketCurrencySettingsUpdateInput!) {
   marketCurrencySettingsUpdate(marketId: $marketId, input: $input) {
@@ -308,7 +308,7 @@ GQL;
 
             Cache::put($cacheKey, $newCurrency !== '' ? $newCurrency : $currencyCode, now()->addHours(24));
 
-            Log::info('Updated primary market currency to match Shopware', [
+            Log::info('Updated primary market currency to match Magento', [
                 'shop' => $shop->shop_domain,
                 'from' => $currentCurrency,
                 'to' => $currencyCode,
@@ -371,7 +371,7 @@ GQL;
     private function resolvePriceListForCurrency(Shop $shop, string $currencyCode): ?string
     {
         $cacheKey = 'shopify:price_list_gid:'.$shop->id.':'.$currencyCode;
-        $name = 'Shopware '.$currencyCode.' Prices';
+        $name = 'Magento '.$currencyCode.' Prices';
         return $this->resolvePriceList($shop, $currencyCode, $name, $cacheKey);
     }
 
@@ -559,7 +559,7 @@ GQL;
 
         $res = $this->client->query($shop, $mutation, [
             'input' => [
-                'name' => 'Shopware '.$currencyCode.' Prices',
+                'name' => 'Magento '.$currencyCode.' Prices',
                 'currency' => $currencyCode,
                 'parent' => [
                     'adjustment' => [

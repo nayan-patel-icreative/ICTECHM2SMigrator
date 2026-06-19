@@ -5,10 +5,10 @@ namespace App\Services\Migration;
 class AdvancedPriceMapper
 {
     /**
-     * Map Shopware product.prices[] to grouped Shopify price list entries.
+     * Map Magento product.prices[] to grouped Shopify price list entries.
      *
-     * @param array<int, array<string, mixed>> $prices  Shopware product.prices[] array
-     * @param array<string, string> $variantIdByShopwareId  swVariantId => shopifyVariantGid
+     * @param array<int, array<string, mixed>> $prices  Magento product.prices[] array
+     * @param array<string, string> $variantIdByMagentoId  magentoVariantId => shopifyVariantGid
      * @param array<int, string>    $allVariantGids  fallback for simple products
      * @param string $currencyCode  e.g. "GBP"
      * @param string $priceMode  "gross" or "net"
@@ -17,7 +17,7 @@ class AdvancedPriceMapper
      */
     public function map(
         array $prices,
-        array $variantIdByShopwareId,
+        array $variantIdByMagentoId,
         array $allVariantGids,
         string $currencyCode,
         string $priceMode = 'gross'
@@ -67,8 +67,8 @@ class AdvancedPriceMapper
 
             // Resolve variant GIDs for this entry
             $productId = trim((string) ($entry['productId'] ?? ''));
-            if ($productId !== '' && isset($variantIdByShopwareId[$productId])) {
-                $variantGids = [$variantIdByShopwareId[$productId]];
+            if ($productId !== '' && isset($variantIdByMagentoId[$productId])) {
+                $variantGids = [$variantIdByMagentoId[$productId]];
             } else {
                 $variantGids = $allVariantGids;
             }

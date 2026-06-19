@@ -62,14 +62,14 @@ class StateMappingController extends Controller
 
         $saved = StateMapping::query()
             ->where('shop_id', $shop->id)
-            ->get(['state_type', 'shopware_state', 'shopify_status']);
+            ->get(['state_type', 'magento_state', 'shopify_status']);
 
         $defaults = self::defaults();
 
         // Merge saved over defaults
         $result = $defaults;
         foreach ($saved as $row) {
-            $result[$row->state_type][$row->shopware_state] = $row->shopify_status;
+            $result[$row->state_type][$row->magento_state] = $row->shopify_status;
         }
 
         // Auto-populate order_state, transaction_state, delivery_state, payment_methods, and shipping_methods dynamically from Magento if connected
@@ -96,7 +96,7 @@ class StateMappingController extends Controller
                             $shopifyStatus = 'cancelled';
                         }
                         StateMapping::query()->firstOrCreate(
-                            ['shop_id' => $shop->id, 'state_type' => 'order_state', 'shopware_state' => $status],
+                            ['shop_id' => $shop->id, 'state_type' => 'order_state', 'magento_state' => $status],
                             ['shopify_status' => $shopifyStatus]
                         );
                         $result['order_state'][$status] = $shopifyStatus;
@@ -113,7 +113,7 @@ class StateMappingController extends Controller
                             $shopifyStatus = 'voided';
                         }
                         StateMapping::query()->firstOrCreate(
-                            ['shop_id' => $shop->id, 'state_type' => 'transaction_state', 'shopware_state' => $status],
+                            ['shop_id' => $shop->id, 'state_type' => 'transaction_state', 'magento_state' => $status],
                             ['shopify_status' => $shopifyStatus]
                         );
                         $result['transaction_state'][$status] = $shopifyStatus;
@@ -126,7 +126,7 @@ class StateMappingController extends Controller
                             $shopifyStatus = 'fulfilled';
                         }
                         StateMapping::query()->firstOrCreate(
-                            ['shop_id' => $shop->id, 'state_type' => 'delivery_state', 'shopware_state' => $status],
+                            ['shop_id' => $shop->id, 'state_type' => 'delivery_state', 'magento_state' => $status],
                             ['shopify_status' => $shopifyStatus]
                         );
                         $result['delivery_state'][$status] = $shopifyStatus;
@@ -153,7 +153,7 @@ class StateMappingController extends Controller
                 foreach ($methods as $key) {
                     if (!isset($result['payment_methods'][$key])) {
                         StateMapping::query()->firstOrCreate(
-                            ['shop_id' => $shop->id, 'state_type' => 'payment_methods', 'shopware_state' => $key],
+                            ['shop_id' => $shop->id, 'state_type' => 'payment_methods', 'magento_state' => $key],
                             ['shopify_status' => '']
                         );
                         $result['payment_methods'][$key] = '';
@@ -179,7 +179,7 @@ class StateMappingController extends Controller
                 foreach ($methods as $key) {
                     if (!isset($result['shipping_methods'][$key])) {
                         StateMapping::query()->firstOrCreate(
-                            ['shop_id' => $shop->id, 'state_type' => 'shipping_methods', 'shopware_state' => $key],
+                            ['shop_id' => $shop->id, 'state_type' => 'shipping_methods', 'magento_state' => $key],
                             ['shopify_status' => '']
                         );
                         $result['shipping_methods'][$key] = '';
@@ -221,8 +221,8 @@ class StateMappingController extends Controller
                 continue;
             }
 
-            foreach ($states as $shopwareState => $shopifyStatus) {
-                if (!is_string($shopwareState) || !is_string($shopifyStatus)) {
+            foreach ($states as $magentoState => $shopifyStatus) {
+                if (!is_string($magentoState) || !is_string($shopifyStatus)) {
                     continue;
                 }
 
@@ -230,7 +230,7 @@ class StateMappingController extends Controller
                     [
                         'shop_id' => $shop->id,
                         'state_type' => $type,
-                        'shopware_state' => $shopwareState,
+                        'magento_state' => $magentoState,
                     ],
                     ['shopify_status' => $shopifyStatus]
                 );
@@ -298,11 +298,11 @@ class StateMappingController extends Controller
     {
         $saved = StateMapping::query()
             ->where('shop_id', $shop->id)
-            ->get(['state_type', 'shopware_state', 'shopify_status']);
+            ->get(['state_type', 'magento_state', 'shopify_status']);
 
         $result = self::defaults();
         foreach ($saved as $row) {
-            $result[$row->state_type][$row->shopware_state] = $row->shopify_status;
+            $result[$row->state_type][$row->magento_state] = $row->shopify_status;
         }
 
         return $result;

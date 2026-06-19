@@ -4,7 +4,7 @@ namespace App\Services\Migration;
 
 use App\Http\Controllers\Api\StateMappingController;
 use App\Models\Shop;
-use App\Support\ShopwareStateResolver;
+use App\Support\MagentoStateResolver;
 
 class StateAssignmentMapper
 {
@@ -95,7 +95,7 @@ class StateAssignmentMapper
      * 1. Transaction state when it maps to a non-pending financial status (e.g. paid, refunded).
      * 2. Order state mapping (Assignments → Order States tab).
      * 3. Transaction state when it maps to pending.
-     * 4. Legacy substring heuristics on raw Shopware transaction states.
+     * 4. Legacy substring heuristics on raw Magento transaction states.
      */
     public function resolveFinancialStatus(Shop $shop, array $order): string
     {
@@ -108,13 +108,13 @@ class StateAssignmentMapper
         if ($txState === '') {
             $tx = data_get($order, 'transactions', []);
             if (is_array($tx) && isset($tx[0]) && is_array($tx[0])) {
-                $txState = ShopwareStateResolver::technicalName($tx[0]);
+                $txState = MagentoStateResolver::technicalName($tx[0]);
             }
         }
 
         $orderStateVal = $status;
         if ($orderStateVal === '') {
-            $orderStateVal = ShopwareStateResolver::technicalName($order);
+            $orderStateVal = MagentoStateResolver::technicalName($order);
         }
 
         $fromTransaction = $this->financialStatusFromStateType(
@@ -172,13 +172,13 @@ class StateAssignmentMapper
         if ($dlState === '') {
             $deliveries = data_get($order, 'deliveries', []);
             if (is_array($deliveries) && isset($deliveries[0]) && is_array($deliveries[0])) {
-                $dlState = ShopwareStateResolver::technicalName($deliveries[0]);
+                $dlState = MagentoStateResolver::technicalName($deliveries[0]);
             }
         }
 
         $orderStateVal = $status;
         if ($orderStateVal === '') {
-            $orderStateVal = ShopwareStateResolver::technicalName($order);
+            $orderStateVal = MagentoStateResolver::technicalName($order);
         }
 
         $fromDelivery = $this->fulfillmentFromStateType(
@@ -225,7 +225,7 @@ class StateAssignmentMapper
         }
         $tx = data_get($order, 'transactions', []);
         if (is_array($tx) && isset($tx[0]) && is_array($tx[0])) {
-            return ShopwareStateResolver::technicalName($tx[0]);
+            return MagentoStateResolver::technicalName($tx[0]);
         }
         return '';
     }
@@ -238,7 +238,7 @@ class StateAssignmentMapper
         }
         $deliveries = data_get($order, 'deliveries', []);
         if (is_array($deliveries) && isset($deliveries[0]) && is_array($deliveries[0])) {
-            return ShopwareStateResolver::technicalName($deliveries[0]);
+            return MagentoStateResolver::technicalName($deliveries[0]);
         }
         return '';
     }
@@ -249,7 +249,7 @@ class StateAssignmentMapper
         if ($status !== '') {
             return $status;
         }
-        return ShopwareStateResolver::technicalName($order);
+        return MagentoStateResolver::technicalName($order);
     }
 
     private function financialStatusFallbackFromRawStates(array $order): string
@@ -278,7 +278,7 @@ class StateAssignmentMapper
             if (!is_array($t)) {
                 continue;
             }
-            $states[] = ShopwareStateResolver::technicalName($t);
+            $states[] = MagentoStateResolver::technicalName($t);
         }
         $joined = strtolower(implode('|', array_filter($states)));
 
@@ -313,7 +313,7 @@ class StateAssignmentMapper
             if (!is_array($delivery)) {
                 continue;
             }
-            $states[] = ShopwareStateResolver::technicalName($delivery);
+            $states[] = MagentoStateResolver::technicalName($delivery);
         }
         $joined = strtolower(implode('|', array_filter($states)));
 

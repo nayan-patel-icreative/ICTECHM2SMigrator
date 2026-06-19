@@ -60,6 +60,50 @@ class MagentoConnectionController extends Controller
             $conn->access_token = $token;
         }
 
+        // Verify connectivity before saving
+        try {
+            $magento = app(MagentoClient::class);
+            $tempConn = clone $conn;
+            $tempConn->api_url = $apiUrl;
+            if (is_string($token) && $token !== '') {
+                $tempConn->access_token = $token;
+            }
+
+            $magento->request($tempConn, 'GET', '/store/storeConfigs', [
+                'timeout' => 10,
+                'connect_timeout' => 5,
+            ]);
+        } catch (\Throwable $e) {
+            $message = $e->getMessage();
+
+            if ($e instanceof \GuzzleHttp\Exception\ClientException) {
+                $response = $e->getResponse();
+                $statusCode = $response ? $response->getStatusCode() : 0;
+
+                if ($statusCode === 404) {
+                    $message = 'The REST API endpoint could not be found (404 Not Found). Please verify that the API URL is your Magento store\'s root URL (e.g., http://magentostore.local) and not a product or category page URL.';
+                } elseif ($statusCode === 401 || $statusCode === 403) {
+                    $message = 'Authentication failed (Unauthorized). Please verify that your Magento Access Token is correct and active.';
+                } else {
+                    $message = 'Magento API returned an error (' . $statusCode . '). Please verify your Magento connection details.';
+                }
+            } elseif ($e instanceof \GuzzleHttp\Exception\ConnectException) {
+                $message = 'Connection failed. Could not reach the Magento server. Please verify that the host domain is correct, active, and accessible.';
+            } else {
+                if (str_contains($message, ' resulted in a `')) {
+                    $parts = explode('response:', $message);
+                    $message = trim($parts[0]);
+                }
+            }
+
+            return response()->json([
+                'message' => 'Could not connect to Magento store. Please check your URL and Access Token.',
+                'errors'  => [
+                    'api_url' => [$message],
+                ],
+            ], 422);
+        }
+
         // Persist language configuration if provided
         if (array_key_exists('language_config', $data)) {
             $langConfig         = $data['language_config'];

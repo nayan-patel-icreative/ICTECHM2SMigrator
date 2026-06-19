@@ -78,7 +78,7 @@ class NewsletterMigrationController extends Controller
 
             if ($includePayload) {
                 $out['payload'] = $payload;
-                $out['shopware_raw'] = $r;
+                $out['magento_raw'] = $r;
             }
 
             $items[] = $out;

@@ -206,7 +206,7 @@ class OrderPayloadMapperMethodsTest extends TestCase
             'shipping_description' => 'Flat Rate - Fixed',
         ];
 
-        $metafields = $mapper->mapShopwareMetafields($order);
+        $metafields = $mapper->mapMagentoMetafields($order);
 
         $this->assertIsArray($metafields);
         
@@ -260,7 +260,7 @@ class OrderPayloadMapperMethodsTest extends TestCase
             ],
         ];
 
-        $metafields = $mapper->mapShopwareMetafields($order);
+        $metafields = $mapper->mapMagentoMetafields($order);
         $byKey = [];
         foreach ($metafields as $m) {
             $byKey[$m['key']] = $m;
@@ -295,7 +295,7 @@ class OrderPayloadMapperMethodsTest extends TestCase
             'payment'      => ['method' => 'free'],
         ];
 
-        $metafields = $mapper->mapShopwareMetafields($order);
+        $metafields = $mapper->mapMagentoMetafields($order);
         $keys = array_column($metafields, 'key');
 
         $this->assertNotContains('invoices_json', $keys);

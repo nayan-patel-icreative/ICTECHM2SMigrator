@@ -52,7 +52,7 @@ class ProductPayloadMapperTest extends TestCase
     public function test_map_magento_metafields(): void
     {
         $mapper = new ProductPayloadMapper();
-        $fields = $mapper->mapShopwareMetafields([
+        $fields = $mapper->mapMagentoMetafields([
             'id' => 123,
             'sku' => 'PN-1',
             'weight' => 2.5,

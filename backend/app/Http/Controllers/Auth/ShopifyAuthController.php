@@ -171,7 +171,7 @@ class ShopifyAuthController extends Controller
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ICTECH M2S Migrator</title>
+    <meta name="shopify-api-key" content="__API_KEY__" />
     <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
     __CSS_TAGS__
   </head>

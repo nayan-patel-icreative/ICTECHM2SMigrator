@@ -1291,7 +1291,7 @@ function App() {
                     <List.Item>Open your Magento Admin panel.</List.Item>
                     <List.Item>Go to System - Extensions - Integrations.</List.Item>
                     <List.Item>Create a new integration and grant appropriate API resource permissions.</List.Item>
-                    <List.Item>Copy the Secret Access Token.</List.Item>
+                    <List.Item>Copy the Access Token.</List.Item>
                     <List.Item>
                       Set the API URL (example): https://your-magento-domain.com
                     </List.Item>
@@ -1462,7 +1462,7 @@ function App() {
                   autoComplete="off"
                 />
                 <TextField
-                  label={secretSaved ? 'Secret Access Token (saved)' : 'Access Token'}
+                  label={secretSaved ? 'Access Token (saved)' : 'Access Token'}
                   value={secretSaved && !editingSecret ? '••••••••••••••••' : accessToken}
                   readOnly={secretSaved && !editingSecret}
                   onChange={(v) => {

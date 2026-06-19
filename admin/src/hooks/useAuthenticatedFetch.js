@@ -1,11 +1,9 @@
-import { getSessionToken } from '@shopify/app-bridge/utilities'
-import { useAppBridge } from '../shopify/appBridgeContext'
-
 export function useAuthenticatedFetch() {
-  const app = useAppBridge()
-
   return async (uri, options = {}) => {
-    const token = await getSessionToken(app)
+    if (!window.shopify || typeof window.shopify.idToken !== 'function') {
+      throw new Error('Shopify App Bridge is not initialized.')
+    }
+    const token = await window.shopify.idToken()
     return fetch(uri, {
       ...options,
       headers: {

@@ -1,10 +1,7 @@
 import { useAuthenticatedFetch } from '../hooks/useAuthenticatedFetch'
-import { Redirect } from '@shopify/app-bridge/actions'
-import { useAppBridge } from '../shopify/appBridgeContext'
 
 export function useApiClient() {
   const fetch = useAuthenticatedFetch()
-  const app = useAppBridge()
 
   const request = async (path, options = {}) => {
     const res = await fetch(path, options)
@@ -16,9 +13,7 @@ export function useApiClient() {
       const body = isJson ? await res.json() : await res.text()
 
       if (body && body.install_url) {
-        const redirect = Redirect.create(app)
-        redirect.dispatch(Redirect.Action.REMOTE, body.install_url)
-
+        open(body.install_url, '_top')
         return
       }
 
@@ -28,8 +23,7 @@ export function useApiClient() {
     if (res.status === 403) {
       const body = isJson ? await res.json() : await res.text()
       if (body && body.reauth_url) {
-        const redirect = Redirect.create(app)
-        redirect.dispatch(Redirect.Action.REMOTE, body.reauth_url)
+        open(body.reauth_url, '_top')
         return
       }
 
